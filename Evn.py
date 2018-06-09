@@ -1,9 +1,12 @@
 from sklearn.preprocessing import LabelBinarizer
 import numpy as np
 import os
+from datetime import datetime
 class Evn:
     def __init__(self):
         self.state = []
+        # mc移动花费的时间
+        self.move_time = 0
         # sensor 和 mc的能量信息
         self.sensors_mobile_charger = {}
         # 保存所有的sensor 编号
@@ -18,7 +21,7 @@ class Evn:
         self.belong = ['1', '0']
         self.belong_label_binarizer = LabelBinarizer()
         self.belong_one_hot_encoded = self.belong_label_binarizer.fit_transform(self.belong)
-        # 对action 独热编码,用字典表示,key: action, value: action的编码结果
+        # 对action 独热编码,用字典表示,key: action(string), value: action的编码结果(ndarray)
         self.action_one_hot_encoded_8 = {}
         self.action_one_hot_encoded_9 = {}
         self.action_one_hot_encoded_10 = {}
@@ -33,6 +36,7 @@ class Evn:
         self.action_one_hot_encoded_19 = {}
         self.action_one_hot_encoded_20 = {}
         self.action_one_hot_encoded_21 = {}
+        self.set_action_one_hot_encoded()
 
     def action_to_one_hot_encoded(self, path, file, action_one_hot_encoded):
         # 存放每个文件中的所有hotspot
@@ -52,7 +56,7 @@ class Evn:
 
         for row in range(rows):
             # 获得独热编码前的hotspot 编号，用这个编号在hotspot_max_staying_time 找到其最大等待时间
-            hotspot = label_binarizer.inverse_transform(hotspot_one_hot_encoded[[row]])
+            hotspot = label_binarizer.inverse_transform(hotspot_one_hot_encoded[[row]])[0]
             for key, value in hotspot_max_staying_time.items():
                 if hotspot == key:
                     max_staying_time = int(hotspot_max_staying_time[key])
@@ -136,12 +140,32 @@ class Evn:
         self.sensors_mobile_charger['MC'] = [2000 * 1000, 50]
 
     def reset(self):
-        # 前面0~47 都初始化为 0
+        # 前面0~47 都初始化为 0。第
         for i in range(48):
             self.state.append(i)
 
 
-if __name__ == '__main__':
-    evn = Evn()
-    evn.set_action_one_hot_encoded()
+    # 将秒 转换成 时间信息
+    def sencods_to_time(self, seconds):
+        hour = int(seconds / 3600)
+        minute = int((seconds - 3600 * hour) / 60)
+        second = seconds - hour * 3600 - minute * 60
+        time_str = str(hour + 8) + ':' + str(minute) + ':' + str(second)
+        time = datetime.strptime(time_str, '%H:%M:%S')
+        return time
 
+    # 获得当前环境的秒
+    def get_evn_time(self):
+        total_t = 0
+        for i in range(48):
+            total_t += self.state[i]
+        total_time = total_t * 5 * 60 + self.move_time
+        return total_time
+
+if __name__ == '__main__':
+    a = np.array([1, 3, 4])
+    a = a[np.newaxis, :]
+    b = np.array(['a', 'b', 'c'])
+    b = b[np.newaxis, :]
+    res = np.c_[b, a]
+    print(res)

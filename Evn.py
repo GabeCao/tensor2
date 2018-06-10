@@ -1,16 +1,17 @@
 from sklearn.preprocessing import LabelBinarizer
-import numpy as np
-import os
-from datetime import datetime
+import math
+from RL_brain_modified import DeepQNetwork
+from Hotspot import Hotspot
 class Evn:
     def __init__(self):
         self.state = []
         # mc移动花费的时间
         self.move_time = 0
+        # 一个回合最大的时间，用秒来表示，早上八点到晚上10点，十四个小时，总共 14 * 3600 秒的时间
+        # 如果self.get_evn_time() 得到的时间大于这个时间，则表示该回合结束
+        self.one_episode_time = 14 * 3600
         # sensor 和 mc的能量信息
         self.sensors_mobile_charger = {}
-        # 保存所有的sensor 编号
-        self.sensors = []
         # 初始化self.sensors_mobile_charger 和 self.sensors
         self.set_sensors_mobile_charger()
         # 对剩余寿命进行独热编码
@@ -21,151 +22,185 @@ class Evn:
         self.belong = ['1', '0']
         self.belong_label_binarizer = LabelBinarizer()
         self.belong_one_hot_encoded = self.belong_label_binarizer.fit_transform(self.belong)
-        # 对action 独热编码,用字典表示,key: action(string), value: action的编码结果(ndarray)
-        self.action_one_hot_encoded_8 = {}
-        self.action_one_hot_encoded_9 = {}
-        self.action_one_hot_encoded_10 = {}
-        self.action_one_hot_encoded_11 = {}
-        self.action_one_hot_encoded_12 = {}
-        self.action_one_hot_encoded_13 = {}
-        self.action_one_hot_encoded_14 = {}
-        self.action_one_hot_encoded_15 = {}
-        self.action_one_hot_encoded_16 = {}
-        self.action_one_hot_encoded_17 = {}
-        self.action_one_hot_encoded_18 = {}
-        self.action_one_hot_encoded_19 = {}
-        self.action_one_hot_encoded_20 = {}
-        self.action_one_hot_encoded_21 = {}
-        self.set_action_one_hot_encoded()
-
-    def action_to_one_hot_encoded(self, path, file, action_one_hot_encoded):
-        # 存放每个文件中的所有hotspot
-        hotspots = []
-        # 存放每个hotspot 对应的最大等待时间
-        hotspot_max_staying_time = {}
-        with open(path + file) as f:
-            for line in f:
-                data = line.strip().split(',')
-                hotspots.append(data[0])
-                hotspot_max_staying_time[data[0]] = data[1]
-        # 对hotpsots 进行独热编码
-        label_binarizer = LabelBinarizer()
-        hotspot_one_hot_encoded = label_binarizer.fit_transform(hotspots)
-        # 获取独热编码后的行和列
-        rows, cols = hotspot_one_hot_encoded.shape
-
-        for row in range(rows):
-            # 获得独热编码前的hotspot 编号，用这个编号在hotspot_max_staying_time 找到其最大等待时间
-            hotspot = label_binarizer.inverse_transform(hotspot_one_hot_encoded[[row]])[0]
-            for key, value in hotspot_max_staying_time.items():
-                if hotspot == key:
-                    max_staying_time = int(hotspot_max_staying_time[key])
-                    # 找到最大等待时间以后，对独热编码后的当前行后面添加一个等待时间(从1到最大等待时间)
-                    for i in range(1, max_staying_time + 1):
-                        tmp = hotspot_one_hot_encoded[row]
-                        tmp = np.r_[tmp, i]
-                        action_one_hot_encoded[hotspot + ',' + str(i)] = tmp
-
-    def set_action_one_hot_encoded(self):
-        # 保存最大等待时间的文件夹
-        path = '五分钟/'
-        files = os.listdir(path)
-        # 对于每个文件,读取文件的内容, 进行热编码放入相应的字典中。例如8.txt代表8时间段的内容，
-        # 放入到action_one_hot_encoded_8字典中
-        for file in files:
-            if file == '8.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_8)
-            elif file == '9.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_9)
-            elif file == '10.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_10)
-            elif file == '11.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_11)
-            elif file == '12.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_12)
-            elif file == '13.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_13)
-            elif file == '14.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_14)
-            elif file == '15.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_15)
-            elif file == '16.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_16)
-            elif file == '17.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_17)
-            elif file == '18.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_18)
-            elif file == '19.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_19)
-            elif file == '20.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_20)
-            elif file == '21.txt':
-                self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_21)
+        # 获得所有的hotspot
+        self.hotspots = []
+        self.set_hotspots()
+        # 记录上一次访问的hotspot 第一次是在环境初始化的时候设置为base_station
+        self.current_hotspot = None
 
     def set_sensors_mobile_charger(self):
-        self.sensors_mobile_charger['000'] = [0.7 * 10.8 * 1000, 0.6, '08:00:00']
-        self.sensors.append('000')
-        self.sensors_mobile_charger['001'] = [0.3 * 10.8 * 1000, 0.8, '08:00:00']
-        self.sensors.append('001')
-        self.sensors_mobile_charger['003'] = [0.9 * 10.8 * 1000, 1, '08:00:00']
-        self.sensors.append('003')
-        self.sensors_mobile_charger['004'] = [0.5 * 10.8 * 1000, 0.5, '08:00:00']
-        self.sensors.append('004')
-        self.sensors_mobile_charger['005'] = [0.1 * 10.8 * 1000, 0.8, '08:00:00']
-        self.sensors.append('005')
-        self.sensors_mobile_charger['015'] = [0.4 * 10.8 * 1000, 0.6, '08:00:00']
-        self.sensors.append('015')
-        self.sensors_mobile_charger['030'] = [1 * 10.8 * 1000, 0.9, '08:00:00']
-        self.sensors.append('030')
-        self.sensors_mobile_charger['042'] = [0.2 * 10.8 * 1000, 0.8, '08:00:00']
-        self.sensors.append('042')
-        self.sensors_mobile_charger['065'] = [1 * 10.8 * 1000, 1, '08:00:00']
-        self.sensors.append('065')
-        self.sensors_mobile_charger['081'] = [0.9 * 10.8 * 1000, 0.7, '08:00:00']
-        self.sensors.append('081')
-        self.sensors_mobile_charger['082'] = [0.8 * 10.8 * 1000, 0.5, '08:00:00']
-        self.sensors.append('082')
-        self.sensors_mobile_charger['085'] = [0.3 * 10.8 * 1000, 0.7, '08:00:00']
-        self.sensors.append('085')
-        self.sensors_mobile_charger['096'] = [0.4 * 10.8 * 1000, 1, '08:00:00']
-        self.sensors.append('096')
-        self.sensors_mobile_charger['125'] = [0.6 * 10.8 * 1000, 0.6, '08:00:00']
-        self.sensors.append('123')
-        self.sensors_mobile_charger['126'] = [0.3 * 10.8 * 1000, 0.5, '08:00:00']
-        self.sensors.append('126')
-        self.sensors_mobile_charger['167'] = [0.5 * 10.8 * 1000, 0.8, '08:00:00']
-        self.sensors.append('167')
-        self.sensors_mobile_charger['179'] = [0.8 * 10.8 * 1000, 0.9, '08:00:00']
-        self.sensors.append('179')
+        self.sensors_mobile_charger['0'] = [0.7 * 10.8 * 1000, 0.6, 0]
+        self.sensors_mobile_charger['1'] = [0.3 * 10.8 * 1000, 0.8, 0]
+        self.sensors_mobile_charger['2'] = [0.9 * 10.8 * 1000, 1, 0]
+        self.sensors_mobile_charger['3'] = [0.5 * 10.8 * 1000, 0.5, 0]
+        self.sensors_mobile_charger['4'] = [0.1 * 10.8 * 1000, 0.8, 0]
+        self.sensors_mobile_charger['5'] = [0.4 * 10.8 * 1000, 0.6, 0]
+        self.sensors_mobile_charger['6'] = [1 * 10.8 * 1000, 0.9, 0]
+        self.sensors_mobile_charger['7'] = [0.2 * 10.8 * 1000, 0.8, 0]
+        self.sensors_mobile_charger['8'] = [1 * 10.8 * 1000, 1, 0]
+        self.sensors_mobile_charger['9'] = [0.9 * 10.8 * 1000, 0.7, 0]
+        self.sensors_mobile_charger['10'] = [0.8 * 10.8 * 1000, 0.5, 0]
+        self.sensors_mobile_charger['11'] = [0.3 * 10.8 * 1000, 0.7, 0]
+        self.sensors_mobile_charger['12'] = [0.4 * 10.8 * 1000, 1, 0]
+        self.sensors_mobile_charger['13'] = [0.6 * 10.8 * 1000, 0.6, 0]
+        self.sensors_mobile_charger['14'] = [0.3 * 10.8 * 1000, 0.5, 0]
+        self.sensors_mobile_charger['15'] = [0.5 * 10.8 * 1000, 0.8, 0]
+        self.sensors_mobile_charger['16'] = [0.8 * 10.8 * 1000, 0.9, 0]
         self.sensors_mobile_charger['MC'] = [2000 * 1000, 50]
 
-    def reset(self):
+    def set_hotspots(self):
+        # 这是编号为0 的hotspot，也就是base_stattion,位于整个充电范围中心
+        base_station = Hotspot((116.333 - 116.318) * 85000 / 2, (40.012 - 39.997) * 110000 / 2, 0)
+        self.hotspots.append(base_station)
+        # 读取hotspot.txt 的文件，获取所有的hotspot，放入self.hotspots中
+        path = 'hotspot.txt'
+        with open(path) as file:
+            for line in file:
+                data = line.strip().split(',')
+                hotspot = Hotspot(float(data[0]), float(data[1]), int(data[2]))
+                self.hotspots.append(hotspot)
+
+    # 根据hotspot 的编号，在self.hotspots 中找到对应的hotpot
+    def find_hotspot_by_num(self, num):
+        for hotspot in self.hotspots:
+            if hotspot.get_num() == num:
+                return hotspot
+
+    # 传入一个action, 得到下一个state，reward，和 done(是否回合结束)的信息
+    def step(self, action):
+        # action 的 表示形如 43,1 表示到43 号hotspot 等待1个t
+        action = action.split(',')
+        # 得到hotspot 的编号
+        hotspot_num = int(action[0])
+        # 得到等待时间
+        staying_time = int(action[1])
+
+        # 得到下一个hotspot
+        hotspot = self.find_hotspot_by_num(hotspot_num)
+        # 当前hotspot 和 下一个hotspot间的距离,得到移动花费的时间，添加到self.move_time 里
+        distance = hotspot.get_distance_between_hotspot(self.current_hotspot)
+        time = distance / 5
+        self.move_time += time
+        # 更新self.current_hotspot 为 action 中选择的 hotspot
+        self.current_hotspot = hotspot
+
+        # 添加到state中的CS
+        self.state[hotspot_num] += staying_time
+        # 获取当前时间段,加8是因为从8点开始
+        senconds = self.get_evn_time()
+        hour = int(senconds / 3600) + 8
+        path = 'hotspot中sensor的访问情况/' + str(hour) + '时间段/' + str(hotspot_num) + '.txt'
+        # 读取文件，得到在当前时间段，hotspot_num 的访问情况，用字典保存。key: sensor 编号；value: 访问次数
+        hotspot_num_sensor_arrivied_times = {}
+        with open(path) as f:
+            for line in f:
+                data = line.strip().split(',')
+                hotspot_num_sensor_arrivied_times[data[0]] = data[1]
+        # 一共17个sensor，现在更新每个sensor 的信息
+        reward = 0
+        for i in range(17):
+            # 取出当前sensor 访问 hotspot_num 的次数,如果大于 0 belong = 1, 表示访问了，否则0，表示没有访问
+            times = int(hotspot_num_sensor_arrivied_times[str(i)])
+            # belong = None
+            if times == 0:
+                belong = str(0)
+            else:
+                belong = str(1)
+            # 取出sensor
+            sensor = self.sensors_mobile_charger[str(i)]
+            # 上一次充电后的电量
+            sensor_energy_after_last_time_charging = sensor[0]
+            # 当前sensor 电量消耗的速率
+            sensor_consumption_ratio = sensor[1]
+            # 上一次的充电时间
+            previous_charging_time = sensor[2]
+            # 当前sensor 的剩余电量
+            sensor_reserved_energy = sensor_energy_after_last_time_charging - \
+                                     (senconds - previous_charging_time) * sensor_consumption_ratio
+            # 当前sensor 的剩余寿命
+            rl = sensor_reserved_energy / sensor_consumption_ratio
+            print('rl  ', rl)
+            # 如果剩余寿命大于两个小时
+            if rl >= 2 * 3600:
+                reward += 0
+                # 得到 大于阈值的 独热编码,转换成list,然后更新state 中的能量状态
+                rl_one_hot_encoded = self.rl_label_binarizer.transform(['Greater than the threshold value, 0']).tolist()[0]
+                start = 48 + i * 4
+                end = start + 2
+                rl_i = 0
+                while start <= end:
+                    self.state[start] = rl_one_hot_encoded[rl_i]
+                    rl_i += 1
+                    start += 1
+                # 更新是否属于 state中 的 是否属于hotspot 的信息
+                # 通过belong 找到对应的 独热编码，转换成list,因为这个独热编码只有一位，所以取第一位得到结果
+                belong_one_hot_encoded = self.belong_label_binarizer.transform([belong]).tolist()[0][0]
+                self.state[start] = belong_one_hot_encoded
+
+            # 如果剩余寿命在0 到 两个小时
+            elif 0 < rl < 2 * 3600:
+                # mc 给该sensor充电， 充电后更新剩余能量
+                self.sensors_mobile_charger['MC'][0] = self.sensors_mobile_charger['MC'][0] \
+                                                       - (10.8 * 1000 - sensor_reserved_energy)
+                # 设置sensor 充电后的剩余能量 是满能量
+                sensor[1] = 10.8 * 1000
+                # 更新上一次被充电的时间
+                sensor[2] = senconds
+                # 更新state中 的剩余寿命信息的状态
+                # 得到 大于阈值的 独热编码,转换成list,然后更新state 中的状态
+                rl_one_hot_encoded = self.rl_label_binarizer.transform(['Greater than the threshold value, 0'])\
+                    .tolist()[0]
+                start = 48 + i * 4
+                end = start + 2
+                rl_i = 0
+                while start <= end:
+                    a = rl_one_hot_encoded[rl_i]
+                    self.state[start] = a
+                    rl_i += 1
+                    start += 1
+                # 更新是否属于 state中 的 是否属于hotspot 的信息
+                # 通过belong 找到对应的 独热编码，转换成list,因为这个独热编码只有一位，所以取第一位得到结果
+                belong_one_hot_encoded = self.belong_label_binarizer.transform([belong]).tolist()[0][0]
+                self.state[start] = belong_one_hot_encoded
+                # 加上得到的奖励,需要先将 rl 的单位先转化成小时
+                rl = rl / 3600
+                reward += math.exp(-rl)
+            else:
+                reward += -0.5
+
+        # mc 给到达的sensor 充电后，如果能量为负或者 self.get_evn_time() > self.one_episode_time，则回合结束，反之继续
+        if self.sensors_mobile_charger['MC'][0] <= 0 or self.get_evn_time() > self.one_episode_time:
+            done = True
+        else:
+            done = False
+
+        return self.state, reward, done
+
+    def reset(self, RL):
         # 前面0~47 都初始化为 0。第
         for i in range(48):
-            self.state.append(i)
+            self.state.append(0)
+        # 得到一个随机的action,例如 43,1 表示到43 号hotspot 等待1个t
+        action = RL.random_action()
+        self.current_hotspot = self.hotspots[0]
+        for i in range(48, 48 + 68 +1):
+            self.state.append(0)
 
-
-    # 将秒 转换成 时间信息
-    def sencods_to_time(self, seconds):
-        hour = int(seconds / 3600)
-        minute = int((seconds - 3600 * hour) / 60)
-        second = seconds - hour * 3600 - minute * 60
-        time_str = str(hour + 8) + ':' + str(minute) + ':' + str(second)
-        time = datetime.strptime(time_str, '%H:%M:%S')
-        return time
+        state_, reward_, done_ = self.step(action)
+        return state_, reward_, done_
 
     # 获得当前环境的秒
     def get_evn_time(self):
         total_t = 0
         for i in range(48):
-            total_t += self.state[i]
+            total_t += 0
         total_time = total_t * 5 * 60 + self.move_time
         return total_time
 
 if __name__ == '__main__':
-    a = np.array([1, 3, 4])
-    a = a[np.newaxis, :]
-    b = np.array(['a', 'b', 'c'])
-    b = b[np.newaxis, :]
-    res = np.c_[b, a]
-    print(res)
+    evn = Evn()
+    RL = DeepQNetwork()
+    observation_, reward, done = evn.reset(RL)
+    print(observation_)
+    print(reward)
+    print(done)

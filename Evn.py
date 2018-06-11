@@ -189,9 +189,9 @@ class Evn:
                         data = point_line.strip().split(',')
                         point_time = self.str_to_seconds(data[2])
                         point = Point(float(data[0]), float(data[1]), data[2])
+
                         # 如果第 i 个sensor的轨迹点的时间 小于end_wait_seconds且大于start_wait_seconds，
                         # 同时轨迹点和hotspot 的距离小于60，则到达该hotspot
-                        start_wait_seconds = 0
                         if (start_wait_seconds <= point_time <= end_wait_seconds) and (point.get_distance_between_point_and_hotspot(self.current_hotspot) < 60):
                             # 取出sensor
                             sensor = self.sensors_mobile_charger[str(i)]

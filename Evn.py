@@ -89,6 +89,9 @@ class Evn:
         self.move_time += time
         # 更新self.current_hotspot 为 action 中选择的 hotspot
         self.current_hotspot = hotspot
+        # 更新mc的剩余能量，减去移动消耗的能量
+        self.sensors_mobile_charger['MC'][0] = self.sensors_mobile_charger['MC'][0] \
+                                               - self.sensors_mobile_charger['MC'][1] * distance
 
         # 获取当前时间段,加8是因为从8点开始
         start_wait_seconds = self.get_evn_time()

@@ -13,7 +13,7 @@ class Point:
     def get_y(self):
         return self.y
 
-    def get_num(self):
+    def get_time(self):
         return self.time
 
     def get_distance_between_point_and_hotspot(self, hotspot):

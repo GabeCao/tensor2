@@ -3,6 +3,8 @@ import math
 from RL_brain_modified import DeepQNetwork
 from Hotspot import Hotspot
 from Point import Point
+
+
 class Evn:
     def __init__(self):
         # 当前环境state
@@ -31,25 +33,25 @@ class Evn:
         self.current_hotspot = None
 
     def set_sensors_mobile_charger(self):
-        # [0.7 * 10.8 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
+        # [0.7 * 6 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
         # 是否已经死掉(计算reward的惩罚值时候使用，避免将一个sensor计算死掉了多次)
-        self.sensors_mobile_charger['0'] = [0.7 * 10.8 * 1000, 0.6, 0, True]
-        self.sensors_mobile_charger['1'] = [0.3 * 10.8 * 1000, 0.8, 0, True]
-        self.sensors_mobile_charger['2'] = [0.9 * 10.8 * 1000, 1, 0, True]
-        self.sensors_mobile_charger['3'] = [0.5 * 10.8 * 1000, 0.5, 0, True]
-        self.sensors_mobile_charger['4'] = [0.1 * 10.8 * 1000, 0.8, 0, True]
-        self.sensors_mobile_charger['5'] = [0.4 * 10.8 * 1000, 0.6, 0, True]
-        self.sensors_mobile_charger['6'] = [1 * 10.8 * 1000, 0.9, 0, True]
-        self.sensors_mobile_charger['7'] = [0.2 * 10.8 * 1000, 0.8, 0, True]
-        self.sensors_mobile_charger['8'] = [1 * 10.8 * 1000, 1, 0, True]
-        self.sensors_mobile_charger['9'] = [0.9 * 10.8 * 1000, 0.7, 0, True]
-        self.sensors_mobile_charger['10'] = [0.8 * 10.8 * 1000, 0.5, 0, True]
-        self.sensors_mobile_charger['11'] = [0.3 * 10.8 * 1000, 0.7, 0, True]
-        self.sensors_mobile_charger['12'] = [0.4 * 10.8 * 1000, 1, 0, True]
-        self.sensors_mobile_charger['13'] = [0.6 * 10.8 * 1000, 0.6, 0, True]
-        self.sensors_mobile_charger['14'] = [0.3 * 10.8 * 1000, 0.5, 0, True]
-        self.sensors_mobile_charger['15'] = [0.5 * 10.8 * 1000, 0.8, 0, True]
-        self.sensors_mobile_charger['16'] = [0.8 * 10.8 * 1000, 0.9, 0, True]
+        self.sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.4, 0, True]
+        self.sensors_mobile_charger['2'] = [0.9 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['3'] = [0.5 * 6 * 1000, 0.4, 0, True]
+        self.sensors_mobile_charger['4'] = [0.2 * 6 * 1000, 0.3, 0, True]
+        self.sensors_mobile_charger['5'] = [0.4 * 6 * 1000, 0.4, 0, True]
+        self.sensors_mobile_charger['6'] = [1 * 6 * 1000, 0.8, 0, True]
+        self.sensors_mobile_charger['7'] = [0.3 * 6 * 1000, 0.3, 0, True]
+        self.sensors_mobile_charger['8'] = [1 * 6 * 1000, 0.4, 0, True]
+        self.sensors_mobile_charger['9'] = [0.9 * 6 * 1000, 0.3, 0, True]
+        self.sensors_mobile_charger['10'] = [0.8 * 6 * 1000, 0.3, 0, True]
+        self.sensors_mobile_charger['11'] = [0.5 * 6 * 1000, 0.5, 0, True]
+        self.sensors_mobile_charger['12'] = [0.4 * 6 * 1000, 0.3, 0, True]
+        self.sensors_mobile_charger['13'] = [0.6 * 6 * 1000, 0.3, 0, True]
+        self.sensors_mobile_charger['14'] = [0.3 * 6 * 1000, 0.3, 0, True]
+        self.sensors_mobile_charger['15'] = [0.9 * 6 * 1000, 0.7, 0, True]
+        self.sensors_mobile_charger['16'] = [0.8 * 6 * 1000, 0.5, 0, True]
         self.sensors_mobile_charger['MC'] = [2000 * 1000, 50]
 
     def set_hotspots(self):
@@ -228,9 +230,9 @@ class Evn:
                             elif 0 < rl < 2 * 3600:
                                 # mc 给该sensor充电， 充电后更新剩余能量
                                 self.sensors_mobile_charger['MC'][0] = self.sensors_mobile_charger['MC'][0] \
-                                                                       - (10.8 * 1000 - sensor_reserved_energy)
+                                                                       - (6 * 1000 - sensor_reserved_energy)
                                 # 设置sensor 充电后的剩余能量 是满能量
-                                sensor[0] = 10.8 * 1000
+                                sensor[0] = 6 * 1000
                                 # 更新被充电的时间
                                 sensor[2] = point_time
                                 # 更新state中 的剩余寿命信息的状态
@@ -311,7 +313,7 @@ class Evn:
     def get_evn_time(self):
         total_t = 0
         for i in range(48):
-            total_t += 0
+            total_t += self.state[i]
         total_time = total_t * 5 * 60 + self.move_time
         return total_time
 

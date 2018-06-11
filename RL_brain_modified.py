@@ -160,7 +160,7 @@ class DeepQNetwork:
             return self.action_one_hot_encoded_19
         elif hour == 20:
             return self.action_one_hot_encoded_20
-        elif hour ==21:
+        elif hour == 21:
             return self.action_one_hot_encoded_21
 
     ###########################################################

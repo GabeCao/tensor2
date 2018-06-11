@@ -5,6 +5,7 @@ from Hotspot import Hotspot
 from Point import Point
 class Evn:
     def __init__(self):
+        # 当前环境state
         self.state = []
         # mc移动花费的时间
         self.move_time = 0
@@ -26,12 +27,12 @@ class Evn:
         # 获得所有的hotspot
         self.hotspots = []
         self.set_hotspots()
-        # 记录上一次访问的hotspot 第一次是在环境初始化的时候设置为base_station
+        # 记录当前时刻所在的hotspot，在环境初始化的时候设置为base_station
         self.current_hotspot = None
 
     def set_sensors_mobile_charger(self):
-        # [0.7 * 10.8 * 1000, 0.6, 0]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
-        # 是否已经死掉(计算reward的惩罚值时候使用，避免将一个sensor计算了多次死掉)
+        # [0.7 * 10.8 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
+        # 是否已经死掉(计算reward的惩罚值时候使用，避免将一个sensor计算死掉了多次)
         self.sensors_mobile_charger['0'] = [0.7 * 10.8 * 1000, 0.6, 0, True]
         self.sensors_mobile_charger['1'] = [0.3 * 10.8 * 1000, 0.8, 0, True]
         self.sensors_mobile_charger['2'] = [0.9 * 10.8 * 1000, 1, 0, True]
@@ -90,22 +91,24 @@ class Evn:
         # 获取当前时间段,加8是因为从8点开始
         start_wait_seconds = self.get_evn_time()
         hour = int(start_wait_seconds / 3600) + 8
-        # 添加到state中的CS
+        # 将在hotspot_num 等待的时间 添加到state中的CS
         self.state[hotspot_num] += staying_time
+        # mc 结束等待后环境的时间
         end_wait_seconds = self.get_evn_time()
         path = 'hotspot中sensor的访问情况/' + str(hour) + '时间段/' + str(hotspot_num) + '.txt'
         # 读取文件，得到在当前时间段，hotspot_num 的访问情况，用字典保存。key: sensor 编号；value: 访问次数
-        hotspot_num_sensor_arrivied_times = {}
+        hotspot_num_sensor_arrived_times = {}
         with open(path) as f:
             for line in f:
                 data = line.strip().split(',')
-                hotspot_num_sensor_arrivied_times[data[0]] = data[1]
+                hotspot_num_sensor_arrived_times[data[0]] = data[1]
         # 一共17个sensor，现在更新每个sensor 的信息
         reward = 0
         for i in range(17):
-            # 取出当前sensor 访问 hotspot_num 的次数,如果大于 0 belong = 1, 表示属于，否则0，表示不属于
-            times = int(hotspot_num_sensor_arrivied_times[str(i)])
-            # times == 0，表示该sensor不属于该hotspot，就不可能到达该hotspot充电
+            # 取出当前sensor 访问 hotspot_num 的次数,如果大于 0 belong = 1, 表示属于，sensor 可能会到达这个hotspot 。
+            # 否则0，表示不属于，sensor 不可能会到达这个hotspot
+            times = int(hotspot_num_sensor_arrived_times[str(i)])
+            # times == 0，表示该sensor不属于该hotspot，不可能到达该hotspot充电
             if times == 0:
                 belong = str(0)
                 # 取出sensor
@@ -140,7 +143,7 @@ class Evn:
                     self.state[start] = belong_one_hot_encoded
                 elif 0 < rl < 2 * 3600:
                     # 更新state中 的剩余寿命信息的状态
-                    # 得到 大于阈值的 独热编码,转换成list,然后更新state 中的状态
+                    # 得到 小于阈值的 独热编码,转换成list,然后更新state 中的状态
                     rl_one_hot_encoded = self.rl_label_binarizer.transform(['Smaller than the threshold value, 1']) \
                         .tolist()[0]
                     start = 48 + i * 4
@@ -157,7 +160,7 @@ class Evn:
                     self.state[start] = belong_one_hot_encoded
                 else:
                     # 更新state中 的剩余寿命信息的状态
-                    # 得到 大于阈值的 独热编码,转换成list,然后更新state 中的状态
+                    # 得到 死掉的 独热编码,转换成list,然后更新state 中的状态
                     rl_one_hot_encoded = self.rl_label_binarizer.transform(['dead, -1']) \
                         .tolist()[0]
                     start = 48 + i * 4
@@ -177,7 +180,7 @@ class Evn:
                         reward += -0.5
                         sensor[3] = False
             else:
-                # times不等于0 的情况下，至少有一个sensor可能会过来
+                # times不等于0 的情况下，sensor可能会过来
                 belong = str(1)
                 # 读取第i 个sensor 的轨迹点信息
                 sensor_path = 'sensor数据/' + str(i) + '.txt'
@@ -186,6 +189,9 @@ class Evn:
                         data = point_line.strip().split(',')
                         point_time = self.str_to_seconds(data[2])
                         point = Point(float(data[0]), float(data[1]), data[2])
+                        # 如果第 i 个sensor的轨迹点的时间 小于end_wait_seconds且大于start_wait_seconds，
+                        # 同时轨迹点和hotspot 的距离小于60，则到达该hotspot
+                        start_wait_seconds = 0
                         if (start_wait_seconds <= point_time <= end_wait_seconds) and (point.get_distance_between_point_and_hotspot(self.current_hotspot) < 60):
                             # 取出sensor
                             sensor = self.sensors_mobile_charger[str(i)]
@@ -224,11 +230,11 @@ class Evn:
                                 self.sensors_mobile_charger['MC'][0] = self.sensors_mobile_charger['MC'][0] \
                                                                        - (10.8 * 1000 - sensor_reserved_energy)
                                 # 设置sensor 充电后的剩余能量 是满能量
-                                sensor[1] = 10.8 * 1000
+                                sensor[0] = 10.8 * 1000
                                 # 更新被充电的时间
                                 sensor[2] = point_time
                                 # 更新state中 的剩余寿命信息的状态
-                                # 得到 大于阈值的 独热编码,转换成list,然后更新state 中的状态
+                                # 得到 小于阈值的 独热编码,转换成list,然后更新state 中的状态
                                 rl_one_hot_encoded = \
                                 self.rl_label_binarizer.transform(['Greater than the threshold value, 0']) \
                                     .tolist()[0]
@@ -248,8 +254,9 @@ class Evn:
                                 rl = rl / 3600
                                 reward += math.exp(-rl)
                             else:
+                                # sensor 能量小于0，在到达hotspot前就死掉了
                                 # 更新state中 的剩余寿命信息的状态
-                                # 得到 大于阈值的 独热编码,转换成list,然后更新state 中的状态
+                                # 得到 死掉的 独热编码,转换成list,然后更新state 中的状态
                                 rl_one_hot_encoded = self.rl_label_binarizer.transform(['dead, -1']) \
                                     .tolist()[0]
                                 start = 48 + i * 4
@@ -277,20 +284,22 @@ class Evn:
 
         return self.state, reward, done
 
+    # 初始化整个环境
     def reset(self, RL):
-        # 前面0~47 都初始化为 0。第
+        # 前面0~47 都初始化为 0。记录CS的信息
         for i in range(48):
             self.state.append(0)
-        # 得到一个随机的action,例如 43,1 表示到43 号hotspot 等待1个t
+        # 48位开始记录sensor的信息,每一个sensor需要4位，17个sensor，共68位
+        for i in range(48, 48 + 68 + 1):
+                self.state.append(0)
+        # 得到一个随机的8点时间段的action,例如 43,1 表示到43 号hotspot 等待1个t
         action = RL.random_action()
         self.current_hotspot = self.hotspots[0]
-        for i in range(48, 48 + 68 +1):
-            self.state.append(0)
 
-        state_, reward_, done_ = self.step(action)
-        return state_, reward_, done_
+        state__, reward_, done_ = self.step(action)
+        return state__, reward_, done_
 
-    # 传入sensor数据中文件的时间字符串，转化成与 08:00:00 间的秒数差
+    # 传入时间字符串，如：09：00：00，转化成与 08:00:00 间的秒数差
     def str_to_seconds(self, input_str):
         data = input_str.split(':')
         hour = int(data[0]) - 8
@@ -309,7 +318,7 @@ class Evn:
 if __name__ == '__main__':
     evn = Evn()
     RL = DeepQNetwork()
-    observation_, reward, done = evn.reset(RL)
-    print(observation_)
+    state_, reward, done = evn.reset(RL)
+    print(state_)
     print(reward)
     print(done)

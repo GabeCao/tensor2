@@ -11,14 +11,5 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
-    sensors_mobile_charger = {}
-
-    sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.6, 0, True]
-    sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.4, 0, True]
-
-
-    mc = copy.deepcopy(sensors_mobile_charger)
-    print(sensors_mobile_charger)
-    sensor = mc['1']
-    sensor[3] = False
-    print(mc)
+    hospot = Hotspot(1,2, 1)
+    print(str(hospot.get_num()) + ',1')

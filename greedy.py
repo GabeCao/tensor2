@@ -1,6 +1,7 @@
 from Hotspot import Hotspot
 import math
 from Point import Point
+import datetime
 class Greedy:
     def __init__(self):
         # sensor 和 mc的能量信息
@@ -13,8 +14,8 @@ class Greedy:
         self.CS = []
         # charging reward
         self.reward = 0
-        # 一个回合最大的时间，用秒来表示，早上八点到晚上10点，十四个小时，总共 14 * 3600 秒的时间
-        # 如果self.get_evn_time() 得到的时间大于这个时间，则表示该回合结束
+        # 一个回合最大的时间，用秒来表示，早上8点到晚上10点，十四个小时，总共 14 * 3600 秒的时间
+        # 如果self.get_evn_time() 得到的当前环境时间大于这个时间，则表示该回合结束
         self.one_episode_time = 14 * 3600
         # mc移动花费的时间
         self.move_time = 0
@@ -76,7 +77,7 @@ class Greedy:
         present_time = str(hour + 8) + ':' + str(minute) + ':' + str(second)
         return present_time
 
-    # 获得当前环境的秒
+    # 获得当前环境时间，单位秒
     def get_evn_time(self):
         total_t = 0
         # 获得CS中的所有等待时间
@@ -88,19 +89,24 @@ class Greedy:
 
     def get_result(self):
         # 如果当前环境时间小于一个回合时间，并且 mc能量大于0
+        with open('C:/E/dataSet/2018-06-11/greedy result.txt', 'a') as res:
+            res.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
         while self.get_evn_time() < self.one_episode_time and self.sensors_mobile_charger['MC'][0] > 0:
             # 获取当前时间段
             current_slot = int(self.get_evn_time() / 3600) + 8
+            print('current_slot ', current_slot)
+            print('residual energy of mc', self.sensors_mobile_charger['MC'][0])
             path = '五分钟/' + str(current_slot) + '.txt'
+            # path = '五分钟/' + str(18) + '.txt'
             with open(path) as f:
+                # 在当前时间段选择带来最大reward 的action
+                # max_chose_reward 和 max_chose_action 暂存最大的reward 和 对应的 action
                 print('choosing action ...........')
                 max_chose_reward = 0
                 max_chose_action = None
                 for line in f:
                     print('testing every action ............')
                     # 对于每一行就是一个action，我们依次迭代计算每一个action带来的reward，
-                    # # 每一次计算都要使用相同的初始环境，所以我们复制self.sensors_mobile_charger = {}
-                    # sensor_mc = copy.deepcopy(self.sensors_mobile_charger)
                     chose_reward = 0
                     chose_action = line.strip()
                     hotspot_num_max_staying_time = line.strip().split(',')
@@ -152,24 +158,38 @@ class Greedy:
                                             sensor[3] = False
 
                     if chose_reward > max_chose_reward:
+                        print('chose_action  ', chose_action)
                         max_chose_reward = chose_reward
                         max_chose_action = chose_action
-                print('the chosen action is  ', max_chose_action)
+                # print('the chosen action is  ', max_chose_action)
                 # 执行max_chose_action
-                print('proceed chosen action ..........')
-                print('选择action 的当前时间', self.seconds_to_time_str(self.get_evn_time()))
-                self.CS.append(max_chose_action)
+                # print('execute chosen action ..........')
+                # print('执行action 时的时间', self.seconds_to_time_str(self.get_evn_time()))
+                if max_chose_action is None:
+                    max_chose_action = str(self.current_hotspot.get_num()) + ',1'
+                    with open('C:/E/dataSet/2018-06-11/greedy result.txt', 'a') as res:
+                        res.write('原地待五分钟  ')
+                    self.CS.append(max_chose_action)
+                print('max_chose_action    ', max_chose_action)
+                with open('C:/E/dataSet/2018-06-11/greedy result.txt', 'a') as res:
+                    res.write(str(self.seconds_to_time_str(self.get_evn_time())) +
+                              '        ' + max_chose_action + '\n')
+
                 next_hotsopot_staying_time = max_chose_action.split(',')
                 next_hotspot = self.find_hotspot_by_num(int(next_hotsopot_staying_time[0]))
                 staying_time = int(next_hotsopot_staying_time[1])
                 # 距离当前hotspot的距离
                 distance = next_hotspot.get_distance_between_hotspot(self.current_hotspot)
                 self.move_time += distance / 5
-                # 到达hotspot后，开始等待，并更新当前属于的hotspot
+                # 到达hotspot后，开始等待，mc减去移动消耗的能量，并更新当前属于的hotspot
                 start_seconds = self.get_evn_time()
+                self.sensors_mobile_charger['MC'][0] = self.sensors_mobile_charger['MC'][0] \
+                                                       - self.sensors_mobile_charger['MC'][1] * distance
                 self.current_hotspot = next_hotspot
                 # 结束等待的时间
                 end_seconds = start_seconds + staying_time * 5 * 60
+                # 将action 添加到 self.CS
+                self.CS.append(max_chose_action)
                 # 获得所有的sensor 轨迹点
                 for i in range(17):
                     sensor_path = 'sensor数据/' + str(i) + '.txt'
@@ -208,10 +228,13 @@ class Greedy:
                                     sensor[2] = point_time
                                     # 加上得到的奖励,需要先将 rl 的单位先转化成小时
                                     rl = rl / 3600
-                                    print('getting reward by proceeding chosen action ', math.exp(-rl))
+                                    # print('getting reward by executing chosen action ', math.exp(-rl))
+                                    with open('C:/E/dataSet/2018-06-11/greedy result.txt', 'a') as res:
+                                        res.write('reward:  ' + str(math.exp(-rl)) + '\n')
                                     self.reward += math.exp(-rl)
                                 else:
                                     if sensor[3] is True:
+                                        print(str(i) + '死掉了')
                                         self.reward += -0.5
                                         sensor[3] = False
 if __name__ == '__main__':

@@ -11,5 +11,6 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
-    hospot = Hotspot(1,2, 1)
-    print(str(hospot.get_num()) + ',1')
+    rl = 2300
+    rl = 2300 / 3600
+    print(rl)

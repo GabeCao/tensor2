@@ -26,23 +26,23 @@ class Greedy:
     def set_sensors_mobile_charger(self):
         # [0.7 * 6 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
         # 是否已经死掉(计算reward的惩罚值时候使用，避免将一个sensor计算死掉了多次)
-        self.sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.6, 0, True]
-        self.sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.4, 0, True]
-        self.sensors_mobile_charger['2'] = [0.9 * 6 * 1000, 0.6, 0, True]
-        self.sensors_mobile_charger['3'] = [0.5 * 6 * 1000, 0.4, 0, True]
-        self.sensors_mobile_charger['4'] = [0.2 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['5'] = [0.4 * 6 * 1000, 0.4, 0, True]
-        self.sensors_mobile_charger['6'] = [1 * 6 * 1000, 0.8, 0, True]
-        self.sensors_mobile_charger['7'] = [0.3 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['8'] = [1 * 6 * 1000, 0.4, 0, True]
-        self.sensors_mobile_charger['9'] = [0.9 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['10'] = [0.8 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['11'] = [0.5 * 6 * 1000, 0.5, 0, True]
-        self.sensors_mobile_charger['12'] = [0.4 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['13'] = [0.6 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['14'] = [0.3 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['15'] = [0.9 * 6 * 1000, 0.7, 0, True]
-        self.sensors_mobile_charger['16'] = [0.8 * 6 * 1000, 0.5, 0, True]
+        self.sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.9, 0, True]
+        self.sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.7, 0, True]
+        self.sensors_mobile_charger['2'] = [0.9 * 6 * 1000, 0.9, 0, True]
+        self.sensors_mobile_charger['3'] = [0.5 * 6 * 1000, 0.7, 0, True]
+        self.sensors_mobile_charger['4'] = [0.2 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['5'] = [0.4 * 6 * 1000, 0.7, 0, True]
+        self.sensors_mobile_charger['6'] = [1 * 6 * 1000, 1, 0, True]
+        self.sensors_mobile_charger['7'] = [0.3 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['8'] = [1 * 6 * 1000, 0.7, 0, True]
+        self.sensors_mobile_charger['9'] = [0.9 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['10'] = [0.8 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['11'] = [0.5 * 6 * 1000, 0.8, 0, True]
+        self.sensors_mobile_charger['12'] = [0.4 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['13'] = [0.6 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['14'] = [0.3 * 6 * 1000, 0.6, 0, True]
+        self.sensors_mobile_charger['15'] = [0.9 * 6 * 1000, 1, 0, True]
+        self.sensors_mobile_charger['16'] = [0.8 * 6 * 1000, 0.8, 0, True]
         self.sensors_mobile_charger['MC'] = [2000 * 1000, 50]
 
     def set_hotspots(self):
@@ -89,7 +89,7 @@ class Greedy:
 
     def get_result(self):
         # 如果当前环境时间小于一个回合时间，并且 mc能量大于0
-        with open('C:/E/dataSet/2018-06-11/greedy result.txt', 'a') as res:
+        with open('C:/E/dataSet/2018-06-11/greedy result 2.txt', 'a') as res:
             res.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
         while self.get_evn_time() < self.one_episode_time and self.sensors_mobile_charger['MC'][0] > 0:
             # 获取当前时间段
@@ -116,7 +116,7 @@ class Greedy:
                     max_staying_time = int(hotspot_num_max_staying_time[1])
                     # 距离当前hotspot的距离
                     distance = hotspot.get_distance_between_hotspot(self.current_hotspot)
-                    move_time = distance / 5
+                    move_time = distance / 3
                     # 到达hotspot后，开始等待
                     start_seconds = self.get_evn_time() + move_time
                     # 结束等待的时间
@@ -180,7 +180,7 @@ class Greedy:
                 staying_time = int(next_hotsopot_staying_time[1])
                 # 距离当前hotspot的距离
                 distance = next_hotspot.get_distance_between_hotspot(self.current_hotspot)
-                self.move_time += distance / 5
+                self.move_time += distance / 3
                 # 到达hotspot后，开始等待，mc减去移动消耗的能量，并更新当前属于的hotspot
                 start_seconds = self.get_evn_time()
                 self.sensors_mobile_charger['MC'][0] = self.sensors_mobile_charger['MC'][0] \
@@ -234,7 +234,8 @@ class Greedy:
                                     self.reward += math.exp(-rl)
                                 else:
                                     if sensor[3] is True:
-                                        print(str(i) + '死掉了')
+                                        with open('C:/E/dataSet/2018-06-11/greedy result.txt', 'a') as res:
+                                            res.write(str(i) + '死掉了' + '\n')
                                         self.reward += -0.5
                                         sensor[3] = False
 if __name__ == '__main__':

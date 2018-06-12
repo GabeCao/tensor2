@@ -1,6 +1,6 @@
 from Hotspot import Hotspot
 from Point import Point
-
+import copy
 
 def str_to_seconds(input_str):
     data = input_str.split(':')
@@ -11,8 +11,14 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
-    a = 3
-    b = a
-    b = 4
-    print(a)
-    print(b)
+    sensors_mobile_charger = {}
+
+    sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.6, 0, True]
+    sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.4, 0, True]
+
+
+    mc = copy.deepcopy(sensors_mobile_charger)
+    print(sensors_mobile_charger)
+    sensor = mc['1']
+    sensor[3] = False
+    print(mc)

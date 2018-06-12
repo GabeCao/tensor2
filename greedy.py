@@ -116,7 +116,7 @@ class Greedy:
                     max_staying_time = int(hotspot_num_max_staying_time[1])
                     # 距离当前hotspot的距离
                     distance = hotspot.get_distance_between_hotspot(self.current_hotspot)
-                    move_time = self.move_time + distance / 5
+                    move_time = distance / 5
                     # 到达hotspot后，开始等待
                     start_seconds = self.get_evn_time() + move_time
                     # 结束等待的时间

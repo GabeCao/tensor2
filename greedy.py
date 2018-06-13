@@ -22,7 +22,7 @@ class Greedy:
         # 当前时刻所在的hotspot，初始化为base_station
         self.current_hotspot = self.hotspots[0]
         # mc移动速度
-        self.speed = 3
+        self.speed = 5
         # mc 移动消耗的能量
         self.mc_move_energy_consumption = 0
         # mc 给sensor充电消耗的能量
@@ -36,23 +36,23 @@ class Greedy:
         # [0.7 * 6 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
         # 是否已经死掉(计算reward的惩罚值时候使用，避免将一个sensor计算死掉了多次)，
         # 最后一个标志位，表示senor在该hotpot，还没有被充过电，如果已经充过了为True，避免被多次充电
-        self.sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.5, 0, True, False]
-        self.sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.3, 0, True, False]
-        self.sensors_mobile_charger['2'] = [0.9 * 6 * 1000, 0.5, 0, True, False]
-        self.sensors_mobile_charger['3'] = [0.5 * 6 * 1000, 0.3, 0, True, False]
-        self.sensors_mobile_charger['4'] = [0.2 * 6 * 1000, 0.2, 0, True, False]
-        self.sensors_mobile_charger['5'] = [0.4 * 6 * 1000, 0.3, 0, True, False]
-        self.sensors_mobile_charger['6'] = [1 * 6 * 1000, 0.6, 0, True, False]
-        self.sensors_mobile_charger['7'] = [0.3 * 6 * 1000, 0.2, 0, True, False]
-        self.sensors_mobile_charger['8'] = [1 * 6 * 1000, 0.3, 0, True, False]
-        self.sensors_mobile_charger['9'] = [0.9 * 6 * 1000, 0.2, 0, True, False]
-        self.sensors_mobile_charger['10'] = [0.8 * 6 * 1000, 0.2, 0, True, False]
-        self.sensors_mobile_charger['11'] = [0.5 * 6 * 1000, 0.4, 0, True, False]
-        self.sensors_mobile_charger['12'] = [0.4 * 6 * 1000, 0.2, 0, True, False]
-        self.sensors_mobile_charger['13'] = [0.6 * 6 * 1000, 0.2, 0, True, False]
-        self.sensors_mobile_charger['14'] = [0.3 * 6 * 1000, 0.2, 0, True, False]
-        self.sensors_mobile_charger['15'] = [0.9 * 6 * 1000, 0.6, 0, True, False]
-        self.sensors_mobile_charger['16'] = [0.8 * 6 * 1000, 0.4, 0, True, False]
+        self.sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.6, 0, True, False]
+        self.sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.4, 0, True, False]
+        self.sensors_mobile_charger['2'] = [0.9 * 6 * 1000, 0.6, 0, True, False]
+        self.sensors_mobile_charger['3'] = [0.5 * 6 * 1000, 0.4, 0, True, False]
+        self.sensors_mobile_charger['4'] = [0.2 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['5'] = [0.4 * 6 * 1000, 0.4, 0, True, False]
+        self.sensors_mobile_charger['6'] = [1 * 6 * 1000, 0.7, 0, True, False]
+        self.sensors_mobile_charger['7'] = [0.3 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['8'] = [1 * 6 * 1000, 0.4, 0, True, False]
+        self.sensors_mobile_charger['9'] = [0.9 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['10'] = [0.8 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['11'] = [0.5 * 6 * 1000, 0.5, 0, True, False]
+        self.sensors_mobile_charger['12'] = [0.4 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['13'] = [0.6 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['14'] = [0.3 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['15'] = [0.9 * 6 * 1000, 0.7, 0, True, False]
+        self.sensors_mobile_charger['16'] = [0.8 * 6 * 1000, 0.5, 0, True, False]
         self.sensors_mobile_charger['MC'] = [2000 * 1000, 50]
 
     def set_hotspots(self):
@@ -130,7 +130,7 @@ class Greedy:
             res.write('程序开始时间       ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
         while self.get_evn_time() < self.one_episode_time and self.sensors_mobile_charger['MC'][0] > 0:
             with open(self.out_put_file, 'a') as res:
-                res.write('新一轮循环开始时间' + str(self.seconds_to_time_str(self.get_evn_time())) + '       ' + str(self.get_evn_time()) + '\n')
+                res.write('新一轮循环开始时间        ' + str(self.seconds_to_time_str(self.get_evn_time())) + '       ' + str(self.get_evn_time()) + '\n')
             # 判断环境中的sensor 是否有死掉的
             for key, value in self.sensors_mobile_charger.items():
                 if key == 'MC':
@@ -317,6 +317,7 @@ class Greedy:
             res.write('\n' + '程序结束时间       ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
             res.write('mc 移动消耗的能量           ' + str(self.mc_move_energy_consumption) + '\n')
             res.write('mc 给sensor充电消耗的能量           ' + str(self.mc_charging_energy_consumption) + '\n')
+            res.write('mc 剩余能量           ' + str(self.sensors_mobile_charger['MC'][0]) + '\n')
             res.write('所获得的奖励       ' + str(self.reward) + '\n')
 
 if __name__ == '__main__':

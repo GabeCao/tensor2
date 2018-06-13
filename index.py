@@ -11,6 +11,8 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
-    rl = 2300
-    rl = 2300 / 3600
-    print(rl)
+    a = 2
+    if a == 3:
+        a = 4
+    a = 5
+    print(a)

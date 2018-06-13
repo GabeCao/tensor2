@@ -21,6 +21,14 @@ class Greedy:
         self.move_time = 0
         # 当前时刻所在的hotspot，初始化为base_station
         self.current_hotspot = self.hotspots[0]
+        # mc移动速度
+        self.speed = 3
+        # mc 移动消耗的能量
+        self.mc_move_energy_consumption = 0
+        # mc 给sensor充电消耗的能量
+        self.mc_charging_energy_consumption = 0
+        # 充电惩罚值
+        self.charging_penalty = -1
 
 
     def set_sensors_mobile_charger(self):
@@ -87,6 +95,27 @@ class Greedy:
         #  CS中的时间加上移动的时间得到总共当前环境的时间
         return total_t * 5 * 60 + self.move_time
 
+    # 计算在hotspot_num 等待 stay_time 时间，碰到sensor_num 的概率
+    # current_slot 当前时间段，计算在当前时间段总共sensor来了几次
+    def probability_T(self, current_slot, staying_time, sensor_num, hotspot_num):
+        start_seconds = (current_slot - 8) * 3600
+        end_seconds = start_seconds + 3600
+        hotspot = self.find_hotspot_by_num(hotspot_num)
+
+        # sensor 整个时间段到达 hotpsot 的次数
+        arrived_times = 0
+        path = 'sensor数据五秒/' + str(sensor_num) + '.txt'
+        with open(path) as f:
+            for line in f:
+                line = line.strip().split(',')
+                point = Point(float(line[0]), float(line[1]), line[2])
+                point_time = self.str_to_seconds(point.get_time())
+
+                if start_seconds <= point_time <= end_seconds and point.get_distance_between_point_and_hotspot(hotspot):
+                    arrived_times += 1
+
+
+
     def get_result(self):
         # 如果当前环境时间小于一个回合时间，并且 mc能量大于0
         with open('C:/E/dataSet/2018-06-11/greedy result 2.txt', 'a') as res:
@@ -116,14 +145,14 @@ class Greedy:
                     max_staying_time = int(hotspot_num_max_staying_time[1])
                     # 距离当前hotspot的距离
                     distance = hotspot.get_distance_between_hotspot(self.current_hotspot)
-                    move_time = distance / 3
+                    move_time = distance / self.speed
                     # 到达hotspot后，开始等待
                     start_seconds = self.get_evn_time() + move_time
                     # 结束等待的时间
                     end_seconds = start_seconds + max_staying_time * 5 * 60
                     # 获得所有的sensor 轨迹点
                     for i in range(17):
-                        sensor_path = 'sensor数据/' + str(i) + '.txt'
+                        sensor_path = 'sensor数据五秒/' + str(i) + '.txt'
                         with open(sensor_path) as sensor_file:
                             for sensor_line in sensor_file:
                                 sensor_line = sensor_line.strip().split(',')
@@ -180,7 +209,7 @@ class Greedy:
                 staying_time = int(next_hotsopot_staying_time[1])
                 # 距离当前hotspot的距离
                 distance = next_hotspot.get_distance_between_hotspot(self.current_hotspot)
-                self.move_time += distance / 3
+                self.move_time += distance / self.speed
                 # 到达hotspot后，开始等待，mc减去移动消耗的能量，并更新当前属于的hotspot
                 start_seconds = self.get_evn_time()
                 self.sensors_mobile_charger['MC'][0] = self.sensors_mobile_charger['MC'][0] \

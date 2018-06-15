@@ -6,6 +6,7 @@ from sklearn.preprocessing import LabelBinarizer
 
 np.random.seed(1)
 tf.set_random_seed(1)
+random.seed(1)
 
 
 # Deep Q Network off-policy

@@ -53,7 +53,7 @@ class Greedy:
         self.sensors_mobile_charger['14'] = [0.3 * 6 * 1000, 0.2, 0, True, False]
         self.sensors_mobile_charger['15'] = [0.9 * 6 * 1000, 0.6, 0, True, False]
         self.sensors_mobile_charger['16'] = [0.8 * 6 * 1000, 0.4, 0, True, False]
-        self.sensors_mobile_charger['MC'] = [2000 * 1000, 50]
+        self.sensors_mobile_charger['MC'] = [1000 * 1000, 50]
 
     def set_hotspots(self):
         # 这是编号为0 的hotspot，也就是base_stattion,位于整个充电范围中心

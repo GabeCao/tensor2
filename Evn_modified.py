@@ -30,30 +30,39 @@ class Evn:
         self.hotspots = []
         self.set_hotspots()
         # 记录当前时刻所在的hotspot，在环境初始化的时候设置为base_station
-        self.current_hotspot = None
+        self.current_hotspot = self.hotspots[0]
 
+        # mc移动速度
+        self.speed = 5
+        # mc 移动消耗的能量
+        self.mc_move_energy_consumption = 0
+        # mc 给sensor充电消耗的能量
+        self.mc_charging_energy_consumption = 0
+        # 充电惩罚值
+        self.charging_penalty = -1
 
     def set_sensors_mobile_charger(self):
         # [0.7 * 6 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
-        # 是否已经死掉(计算reward的惩罚值时候使用，避免将一个sensor计算死掉了多次)
-        self.sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.6, 0, True]
-        self.sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.4, 0, True]
-        self.sensors_mobile_charger['2'] = [0.9 * 6 * 1000, 0.6, 0, True]
-        self.sensors_mobile_charger['3'] = [0.5 * 6 * 1000, 0.4, 0, True]
-        self.sensors_mobile_charger['4'] = [0.2 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['5'] = [0.4 * 6 * 1000, 0.4, 0, True]
-        self.sensors_mobile_charger['6'] = [1 * 6 * 1000, 0.8, 0, True]
-        self.sensors_mobile_charger['7'] = [0.3 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['8'] = [1 * 6 * 1000, 0.4, 0, True]
-        self.sensors_mobile_charger['9'] = [0.9 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['10'] = [0.8 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['11'] = [0.5 * 6 * 1000, 0.5, 0, True]
-        self.sensors_mobile_charger['12'] = [0.4 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['13'] = [0.6 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['14'] = [0.3 * 6 * 1000, 0.3, 0, True]
-        self.sensors_mobile_charger['15'] = [0.9 * 6 * 1000, 0.7, 0, True]
-        self.sensors_mobile_charger['16'] = [0.8 * 6 * 1000, 0.5, 0, True]
-        self.sensors_mobile_charger['MC'] = [2000 * 1000, 50]
+        # 是否已经死掉(计算reward的惩罚值时候使用，避免将一个sensor计算死掉了多次)，
+        # 最后一个标志位，表示senor在该hotpot，还没有被充过电，如果已经充过了为True，避免被多次充电
+        self.sensors_mobile_charger['0'] = [0.7 * 6 * 1000, 0.5, 0, True, False]
+        self.sensors_mobile_charger['1'] = [0.3 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['2'] = [0.9 * 6 * 1000, 0.5, 0, True, False]
+        self.sensors_mobile_charger['3'] = [0.5 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['4'] = [0.2 * 6 * 1000, 0.2, 0, True, False]
+        self.sensors_mobile_charger['5'] = [0.4 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['6'] = [1 * 6 * 1000, 0.6, 0, True, False]
+        self.sensors_mobile_charger['7'] = [0.3 * 6 * 1000, 0.5, 0, True, False]
+        self.sensors_mobile_charger['8'] = [1 * 6 * 1000, 0.3, 0, True, False]
+        self.sensors_mobile_charger['9'] = [0.9 * 6 * 1000, 0.2, 0, True, False]
+        self.sensors_mobile_charger['10'] = [0.8 * 6 * 1000, 0.2, 0, True, False]
+        self.sensors_mobile_charger['11'] = [0.5 * 6 * 1000, 0.4, 0, True, False]
+        self.sensors_mobile_charger['12'] = [0.4 * 6 * 1000, 0.2, 0, True, False]
+        self.sensors_mobile_charger['13'] = [0.6 * 6 * 1000, 0.2, 0, True, False]
+        self.sensors_mobile_charger['14'] = [0.3 * 6 * 1000, 0.2, 0, True, False]
+        self.sensors_mobile_charger['15'] = [0.9 * 6 * 1000, 0.6, 0, True, False]
+        self.sensors_mobile_charger['16'] = [0.8 * 6 * 1000, 0.4, 0, True, False]
+        self.sensors_mobile_charger['MC'] = [1000 * 1000, 50]
 
     def set_hotspots(self):
         # 这是编号为0 的hotspot，也就是base_stattion,位于整个充电范围中心
@@ -73,8 +82,14 @@ class Evn:
             if hotspot.get_num() == num:
                 return hotspot
 
+    def initial_is_charged(self):
+        for key, value in self.sensors_mobile_charger.items():
+            if key != 'MC':
+                value[4] = False
+
     # 传入一个action, 得到下一个state，reward，和 done(是否回合结束)的信息
     def step(self, action):
+        reward = 0
         # action 的 表示形如 43,1 表示到43 号hotspot 等待1个t
         action = action.split(',')
         # 得到hotspot 的编号
@@ -86,8 +101,26 @@ class Evn:
         hotspot = self.find_hotspot_by_num(hotspot_num)
         # 当前hotspot 和 下一个hotspot间的距离,得到移动花费的时间，添加到self.move_time 里
         distance = hotspot.get_distance_between_hotspot(self.current_hotspot)
-        time = distance / 5
+        time = distance / self.speed
         self.move_time += time
+
+        for key, value in self.sensors_mobile_charger.items():
+            if key == 'MC':
+                break
+            sensor_energy_after_last_time_charging = value[0]
+            # 当前sensor 电量消耗的速率
+            sensor_consumption_ratio = value[1]
+            # 上一次的充电时间
+            previous_charging_time = value[2]
+            # 当前sensor 的剩余电量
+            evn_time = self.get_evn_time()
+            sensor_reserved_energy = sensor_energy_after_last_time_charging - \
+                                     (evn_time - previous_charging_time) * sensor_consumption_ratio
+            # 如果剩余能量小于0，且value[3] is True，则sensor第一次死亡，reward 减去惩罚值
+            if (sensor_reserved_energy < 0) and (value[3] is True):
+                value[3] = False
+                reward += self.charging_penalty
+
         # 更新self.current_hotspot 为 action 中选择的 hotspot
         self.current_hotspot = hotspot
         # 更新mc的剩余能量，减去移动消耗的能量
@@ -101,6 +134,9 @@ class Evn:
         self.state[hotspot_num] += staying_time
         # mc 结束等待后环境的时间
         end_wait_seconds = self.get_evn_time()
+        # 在一次执行action 的过程中，sensor只能被充电一次
+        self.initial_is_charged()
+
         path = 'hotspot中sensor的访问情况/' + str(hour) + '时间段/' + str(hotspot_num) + '.txt'
         # 读取文件，得到在当前时间段，hotspot_num 的访问情况，用字典保存。key: sensor 编号；value: 访问次数
         hotspot_num_sensor_arrived_times = {}
@@ -109,7 +145,7 @@ class Evn:
                 data = line.strip().split(',')
                 hotspot_num_sensor_arrived_times[data[0]] = data[1]
         # 一共17个sensor，现在更新每个sensor 的信息
-        reward = 0
+
         for i in range(17):
             # 取出当前sensor 访问 hotspot_num 的次数,如果大于 0 belong = 1, 表示属于，sensor 可能会到达这个hotspot 。
             # 否则0，表示不属于，sensor 不可能会到达这个hotspot
@@ -134,8 +170,7 @@ class Evn:
                 # 如果剩余寿命大于两个小时
                 if rl >= 2 * 3600:
                     # 得到 大于阈值的 独热编码,转换成list,然后更新state 中的能量状态
-                    rl_one_hot_encoded = \
-                    self.rl_label_binarizer.transform(['Greater than the threshold value, 0']).tolist()[0]
+                    rl_one_hot_encoded = self.rl_label_binarizer.transform(['Greater than the threshold value, 0']).tolist()[0]
                     start = 48 + i * 4
                     end = start + 2
                     rl_i = 0
@@ -181,17 +216,19 @@ class Evn:
                     # 通过belong 找到对应的 独热编码，转换成list,因为这个独热编码只有一位，所以取第一位得到结果
                     belong_one_hot_encoded = self.belong_label_binarizer.transform([belong]).tolist()[0][0]
                     self.state[start] = belong_one_hot_encoded
-                    # 如果这个sensor是第一次死掉，那么reward减去 0.5
-                    if sensor[3] is True:
-                        reward += -0.5
-                        sensor[3] = False
+
             else:
                 # times不等于0 的情况下，sensor可能会过来
                 belong = str(1)
                 # 读取第i 个sensor 的轨迹点信息
-                sensor_path = 'sensor数据/' + str(i) + '.txt'
+                sensor_path = 'sensor数据五秒/' + str(i) + '.txt'
                 with open(sensor_path) as f:
                     for point_line in f:
+                        # 检查当前sensor 是否在该hotspot 已经被充过电了，如果是，跳出循环
+                        sensor_is_charged = self.sensors_mobile_charger[str(i)]
+                        if sensor_is_charged[4] is True:
+                            break
+
                         data = point_line.strip().split(',')
                         point_time = self.str_to_seconds(data[2])
                         point = Point(float(data[0]), float(data[1]), data[2])
@@ -240,10 +277,8 @@ class Evn:
                                 # 更新被充电的时间
                                 sensor[2] = point_time
                                 # 更新state中 的剩余寿命信息的状态
-                                # 得到 小于阈值的 独热编码,转换成list,然后更新state 中的状态
-                                rl_one_hot_encoded = \
-                                self.rl_label_binarizer.transform(['Greater than the threshold value, 0']) \
-                                    .tolist()[0]
+                                # 得到 大于阈值的 独热编码,转换成list,然后更新state 中的状态
+                                rl_one_hot_encoded = self.rl_label_binarizer.transform(['Greater than the threshold value, 0']).tolist()[0]
                                 start = 48 + i * 4
                                 end = start + 2
                                 rl_i = 0
@@ -277,10 +312,6 @@ class Evn:
                                 # 通过belong 找到对应的 独热编码，转换成list,因为这个独热编码只有一位，所以取第一位得到结果
                                 belong_one_hot_encoded = self.belong_label_binarizer.transform([belong]).tolist()[0][0]
                                 self.state[start] = belong_one_hot_encoded
-                                # 如果这个sensor是第一次死掉，那么reward减去 0.5
-                                if sensor[3] is True:
-                                    reward += -0.5
-                                    sensor[3] = False
 
         # mc 给到达的sensor 充电后，如果能量为负或者 self.get_evn_time() > self.one_episode_time，则回合结束，反之继续
         if self.sensors_mobile_charger['MC'][0] <= 0 or self.get_evn_time() > self.one_episode_time:
@@ -305,7 +336,7 @@ class Evn:
         state__, reward_, done_ = self.step(action)
         return state__, reward_, done_
 
-    # 传入时间字符串，如：09：00：00，转化成与 08:00:00 间的秒数差
+    # 传入时间字符串，如：09：02：03，转化成与 08:00:00 间的秒数差
     def str_to_seconds(self, input_str):
         data = input_str.split(':')
         hour = int(data[0]) - 8

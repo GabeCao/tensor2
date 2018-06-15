@@ -3,6 +3,7 @@ import tensorflow as tf
 import random
 import os
 from sklearn.preprocessing import LabelBinarizer
+import sys
 
 np.random.seed(1)
 tf.set_random_seed(1)
@@ -14,7 +15,7 @@ class DeepQNetwork:
     def __init__(
             self,
             n_actions=1,
-            n_features=117,
+            n_features=160,
             learning_rate=0.01,
             reward_decay=0.9,
             e_greedy=0.9,
@@ -39,7 +40,7 @@ class DeepQNetwork:
         self.learn_step_counter = 0
 
         # initialize zero memory [s, a, r, s_]
-        self.memory = np.zeros((self.memory_size, n_features * 2 + 2))
+        self.memory = np.zeros((self.memory_size, 117 * 2 + 3))
 
         # consist of [target_net, evaluate_net]
         self._build_net()
@@ -58,6 +59,10 @@ class DeepQNetwork:
         self.cost_his = []
 
         # ################从这开始都是新添加的属性###############################
+        # 对 42个hotspot 进行独热编码
+        self.hotspots_num = [str(i) for i in range(1, 43)]
+        self.hotspot_num_one_hot_encoded_label_binarizer = LabelBinarizer()
+        self.hotspot_num_one_hot_encoded = self.hotspot_num_one_hot_encoded_label_binarizer.fit_transform(self.hotspots_num)
         # 对action 独热编码,用字典表示,key: action(string), value: action的编码结果(ndarray)
         self.action_one_hot_encoded_8 = {}
         self.action_one_hot_encoded_9 = {}
@@ -124,8 +129,9 @@ class DeepQNetwork:
         if not hasattr(self, 'memory_counter'):
             self.memory_counter = 0
 
-        transition = np.hstack((s, [a, r], s_))
-
+        action_hotspot = a[0]
+        action_staying_time = a[1]
+        transition = np.hstack((s, [action_hotspot, action_staying_time, r], s_))
         # replace the old memory with new memory
         index = self.memory_counter % self.memory_size
         self.memory[index, :] = transition
@@ -177,19 +183,23 @@ class DeepQNetwork:
 
             ###########################################################
             # 获得当前的时间段，通过当前时间段获得 对应的action 独热编码
-            hour = int(seconds / 3600)
+            hour = int(seconds / 3600) + 8
             current_phase = self.get_current_action_one_hot_encoded(hour)
-            chose_value = 0
+            chose_value = -sys.maxsize-1
             chose_action = None
             # 遍历所有action 找到神经网络返回最大的action_value 的 action
             for key, value in current_phase.items():
                 value = value[np.newaxis, :]
                 action_observation = np.c_[value, observation]
                 action_value = self.sess.run(self.q_eval, feed_dict={self.s: action_observation})
-                if action_value > chose_value:
+                if action_value[0][0] > chose_value:
                     chose_value = action_value
                     chose_action = key
             action = chose_action
+            # 对action 处理，因为得到的action 形如 '23,4' ，表示在第23个hotspot 待4个t,转换成ndarray [23 4]
+            action = list(action.split(','))
+            action = list(map(int, action))
+            action = np.array(action)
             ###########################################################
 
         else:
@@ -198,12 +208,19 @@ class DeepQNetwork:
             current_phase = self.get_current_action_one_hot_encoded
             # 随机从current_phase 选出一个action，代码其他的地方好像用的是伪随机数
             action, _ = random.choice(list(current_phase.items()))
+            # 对action 处理，因为得到的action 形如 '23,4' ，表示在第23个hotspot 待4个t,转换成ndarray [23 4]
+            action = list(action.split(','))
+            action = list(map(int, action))
+            action = np.array(action)
             ###########################################################
         return action
 
     # 在八点时刻，随机选一个action。这个函数供环境在初始化的时候使用
     def random_action(self):
         action, _ = random.choice(list(self.action_one_hot_encoded_8.items()))
+        action = list(action.split(','))
+        action = list(map(int, action))
+        action = np.array(action)
         return action
 
     def action_to_one_hot_encoded(self, path, file, action_one_hot_encoded):
@@ -217,22 +234,30 @@ class DeepQNetwork:
                 hotspots.append(data[0])
                 hotspot_max_staying_time[data[0]] = data[1]
         # 对hotpsots 进行独热编码
-        label_binarizer = LabelBinarizer()
-        hotspot_one_hot_encoded = label_binarizer.fit_transform(hotspots)
+        # label_binarizer = LabelBinarizer()
+        # hotspot_one_hot_encoded = label_binarizer.fit_transform(hotspots)
         # 获取独热编码后的行和列
-        rows, cols = hotspot_one_hot_encoded.shape
+        # rows, cols = self.hotspot_num_one_hot_encoded.shape
 
-        for row in range(rows):
-            # 获得独热编码前的hotspot 编号，用这个编号在hotspot_max_staying_time 找到其最大等待时间
-            hotspot = label_binarizer.inverse_transform(hotspot_one_hot_encoded[[row]])[0]
-            for key, value in hotspot_max_staying_time.items():
-                if hotspot == key:
-                    max_staying_time = int(hotspot_max_staying_time[key])
-                    # 找到最大等待时间以后，对独热编码后的当前行后面添加一个等待时间(从1到最大等待时间)
-                    for i in range(1, max_staying_time + 1):
-                        tmp = hotspot_one_hot_encoded[row]
-                        tmp = np.r_[tmp, i]
-                        action_one_hot_encoded[hotspot + ',' + str(i)] = tmp
+        for hotspot_num, max_staying_time in hotspot_max_staying_time.items():
+            # 根据hotspot_num 找到 对应的热编码后的结果
+            hotspot_num_encoded = self.hotspot_num_one_hot_encoded_label_binarizer.transform([hotspot_num])[0]
+            max_staying_time = int(max_staying_time)
+            for i in range(1, max_staying_time + 1):
+                tmp = np.r_[hotspot_num_encoded, i]
+                action_one_hot_encoded[hotspot_num + ',' + str(i)] = tmp
+
+        # for row in range(rows):
+        #     # 获得独热编码前的hotspot 编号，用这个编号在hotspot_max_staying_time 找到其最大等待时间
+        #     hotspot = label_binarizer.inverse_transform(hotspot_one_hot_encoded[[row]])[0]
+        #     for key, value in hotspot_max_staying_time.items():
+        #         if hotspot == key:
+        #             max_staying_time = int(hotspot_max_staying_time[key])
+        #             # 找到最大等待时间以后，对独热编码后的当前行后面添加一个等待时间(从1到最大等待时间)
+        #             for i in range(1, max_staying_time + 1):
+        #                 tmp = hotspot_one_hot_encoded[row]
+        #                 tmp = np.r_[tmp, i]
+        #                 action_one_hot_encoded[hotspot + ',' + str(i)] = tmp
 
     def set_action_one_hot_encoded(self):
         # 保存最大等待时间的文件夹
@@ -270,7 +295,7 @@ class DeepQNetwork:
             elif file == '21.txt':
                 self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_21)
 
-    def learn(self):
+    def learn(self, seconds):
         # check to replace target parameters
         if self.learn_step_counter % self.replace_target_iter == 0:
             self.sess.run(self.replace_target_op)
@@ -283,21 +308,36 @@ class DeepQNetwork:
             sample_index = np.random.choice(self.memory_counter, size=self.batch_size)
         batch_memory = self.memory[sample_index, :]
 
-        q_next, q_eval = self.sess.run(
-            [self.q_next, self.q_eval],
-            feed_dict={
-                self.s_: batch_memory[:, -self.n_features:],  # fixed params
-                self.s: batch_memory[:, :self.n_features],  # newest params
-            })
+        # q_next, q_eval = self.sess.run(
+        #     [self.q_next, self.q_eval],
+        #     feed_dict={
+        #         self.s_: batch_memory[:, -self.n_features:],  # fixed params
+        #         self.s: batch_memory[:, :self.n_features],  # newest params
+        #     })
+        # ################################################################
+        # 获得当前的时间段，通过当前时间段 所有action 中的最大reward
+        hour = int(seconds / 3600) + 8
+        current_phase = self.get_current_action_one_hot_encoded(hour)
+        chose_value = 0
+        # 遍历所有action 找到神经网络返回最大的action_value 的 action
+        for _, action in current_phase.items():
+            action = action[np.newaxis, :]
+            # action_observation = np.c_[action, observation]
+            action_value = self.sess.run(self.q_next,
+                                         feed_dict={self.s: np.c_[action, batch_memory[:, -self.n_features:]]})
+            if action_value > chose_value:
+                chose_value = action_value
 
-        # change q_target w.r.t q_eval's action
-        q_target = q_eval.copy()
-
-        batch_index = np.arange(self.batch_size, dtype=np.int32)
-        eval_act_index = batch_memory[:, self.n_features].astype(int)
         reward = batch_memory[:, self.n_features + 1]
+        q_target = reward + self.gamma * chose_value
+        # change q_target w.r.t q_eval's action
+        # q_target = q_eval.copy()
 
-        q_target[batch_index, eval_act_index] = reward + self.gamma * np.max(q_next, axis=1)
+        # batch_index = np.arange(self.batch_size, dtype=np.int32)
+        # eval_act_index = batch_memory[:, self.n_features].astype(int)
+        # reward = batch_memory[:, self.n_features + 1]
+        #
+        # q_target[batch_index, eval_act_index] = reward + self.gamma * np.max(q_next, axis=1)
 
         """
         For example in this batch I have 2 samples and 3 actions:

@@ -11,11 +11,37 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
-    a = np.array([[1, 2, 3],
-                  [2, 4, 9]
-                  ])
+    a = np.array([1, 2, 3])
+    b = np.array([4, 5, 6])
+    c = np.r_[a, b]
+    a[1] = 9
     print(a)
-    print(a[:, 2])
+    print(b)
+    print(c)
+    # a = [str(i) for i in range(1, 43)]
+    # print(a)
+    # label_binarizer = LabelBinarizer()
+    # a_encoded = label_binarizer.fit_transform(a)
+    # print(label_binarizer.transform(['3']))
+    # a = np.array([[2]])
+    # print(a[0][0])
+    # a = list('23,4'.split(','))
+    # a = list(map(int, a))
+    # a = np.array(a)
+    # print(a[0])
+    # print(a[1])
+    # print(a)
+    # a = np.array([[1, 2, 3],
+    #               [2, 4, 9],
+    #               [1, 22, 33],
+    #               [2, 44, 55]
+    #               ])
+    # b = np.random.choice(4, size=2)
+    # print(b)
+    # c = a[b, :]
+    # print(c)
+    # d = c[:, -2:]
+    # print(d)
 
     # random.seed(1)
     # np.random.seed(1)

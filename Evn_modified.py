@@ -3,6 +3,7 @@ import math
 from RL_brain_modified import DeepQNetwork
 from Hotspot import Hotspot
 from Point import Point
+import numpy as np
 
 
 class Evn:
@@ -17,7 +18,7 @@ class Evn:
         # sensor 和 mc的能量信息
         self.sensors_mobile_charger = {}
         # 初始化self.sensors_mobile_charger 和 self.sensors
-        self.set_sensors_mobile_charger()
+        # self.set_sensors_mobile_charger()
         # 对剩余寿命进行独热编码
         self.rl = ['Greater than the threshold value, 0', 'Smaller than the threshold value, 1', 'dead, -1']
         self.rl_label_binarizer = LabelBinarizer()
@@ -28,7 +29,6 @@ class Evn:
         self.belong_one_hot_encoded = self.belong_label_binarizer.fit_transform(self.belong)
         # 获得所有的hotspot
         self.hotspots = []
-        self.set_hotspots()
         # 记录当前时刻所在的hotspot，在环境初始化的时候设置为base_station
         self.current_hotspot = self.hotspots[0]
 
@@ -40,6 +40,8 @@ class Evn:
         self.mc_charging_energy_consumption = 0
         # 充电惩罚值
         self.charging_penalty = -1
+
+        self.done = False
 
     def set_sensors_mobile_charger(self):
         # [0.7 * 6 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
@@ -91,11 +93,15 @@ class Evn:
     def step(self, action):
         reward = 0
         # action 的 表示形如 43,1 表示到43 号hotspot 等待1个t
-        action = action.split(',')
+        # action = action.split(',')
         # 得到hotspot 的编号
-        hotspot_num = int(action[0])
+        # hotspot_num = int(action[0])
         # 得到等待时间
-        staying_time = int(action[1])
+        # staying_time = int(action[1])
+
+        # action 是ndarray 一维 形如[23  4] 表示在第23个hotspot，等待4个t
+        hotspot_num = action[0]
+        staying_time = action[1]
 
         # 得到下一个hotspot
         hotspot = self.find_hotspot_by_num(hotspot_num)
@@ -315,14 +321,20 @@ class Evn:
 
         # mc 给到达的sensor 充电后，如果能量为负或者 self.get_evn_time() > self.one_episode_time，则回合结束，反之继续
         if self.sensors_mobile_charger['MC'][0] <= 0 or self.get_evn_time() > self.one_episode_time:
-            done = True
+            self.done = True
         else:
-            done = False
+            self.done = False
 
-        return self.state, reward, done
+        print(self.done)
+        observation = np.array(self.state)
+        return observation, reward, self.done
 
     # 初始化整个环境
     def reset(self, RL):
+        # 初始化所有的sensor,mc 的能量信息
+        self.set_sensors_mobile_charger()
+        # 初始化hotspots
+        self.set_hotspots()
         # 前面0~47 都初始化为 0。记录CS的信息
         for i in range(48):
             self.state.append(0)
@@ -352,10 +364,17 @@ class Evn:
         total_time = total_t * 5 * 60 + self.move_time
         return total_time
 
+    def test(self):
+        self.done = True
+        return 2, 4, self.done
 if __name__ == '__main__':
     evn = Evn()
-    RL = DeepQNetwork()
-    state_, reward, done = evn.reset(RL)
-    print(state_)
+    s_, reward, done = evn.test()
+    print(s_)
     print(reward)
     print(done)
+    # RL = DeepQNetwork()
+    # state_, reward, done = evn.reset(RL)
+    # print(state_)
+    # print(reward)
+    # print(done)

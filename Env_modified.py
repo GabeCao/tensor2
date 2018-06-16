@@ -364,7 +364,7 @@ class Env:
         self.done = True
         return 2, 4, self.done
 if __name__ == '__main__':
-    evn = Evn()
+    evn = Env()
     s_, reward, done = evn.test()
     print(s_)
     print(reward)

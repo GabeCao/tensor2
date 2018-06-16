@@ -40,7 +40,7 @@ class DeepQNetwork:
         self.learn_step_counter = 0
 
         # initialize zero memory [s, a, r, s_]
-        self.memory = np.zeros((self.memory_size, 117 * 2 + 3))
+        self.memory = np.zeros((self.memory_size, 117 * 2 + 3 + 43 + 1))
 
         # consist of [target_net, evaluate_net]
         self._build_net()
@@ -92,15 +92,20 @@ class DeepQNetwork:
 
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [self.n_features, n_l1], initializer=w_initializer, collections=c_names)
-                b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [self.n_features, 200], initializer=w_initializer, collections=c_names)
+                b1 = tf.get_variable('b1', [1, 200], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(self.s, w1) + b1)
 
-            # second layer. collections is used later when assign to target net
             with tf.variable_scope('l2'):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-                self.q_eval = tf.matmul(l1, w2) + b2
+                w2 = tf.get_variable('w2', [200, 200], initializer=w_initializer, collections=c_names)
+                b2 = tf.get_variable('b2', [1, 200], initializer=b_initializer, collections=c_names)
+                l2 = tf.nn.relu(tf.matmul(l1, w2) + b2)
+
+            # second layer. collections is used later when assign to target net
+            with tf.variable_scope('l3'):
+                w3 = tf.get_variable('w3', [200, self.n_actions], initializer=w_initializer, collections=c_names)
+                b3 = tf.get_variable('b3', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+                self.q_eval = tf.matmul(l2, w3) + b3
 
         with tf.variable_scope('loss'):
             self.loss = tf.reduce_mean(tf.squared_difference(self.q_target, self.q_eval))
@@ -115,23 +120,29 @@ class DeepQNetwork:
 
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [self.n_features, n_l1], initializer=w_initializer, collections=c_names)
-                b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [self.n_features, 200], initializer=w_initializer, collections=c_names)
+                b1 = tf.get_variable('b1', [1, 200], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(self.s_, w1) + b1)
 
-            # second layer. collections is used later when assign to target net
             with tf.variable_scope('l2'):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-                self.q_next = tf.matmul(l1, w2) + b2
+                w2 = tf.get_variable('w2', [200, 200], initializer=w_initializer, collections=c_names)
+                b2 = tf.get_variable('b2', [1, 200], initializer=b_initializer, collections=c_names)
+                l2 = tf.nn.relu(tf.matmul(l1, w2) + b2)
+
+            # second layer. collections is used later when assign to target net
+            with tf.variable_scope('l3'):
+                w3 = tf.get_variable('w3', [200, self.n_actions], initializer=w_initializer, collections=c_names)
+                b3 = tf.get_variable('b3', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+                self.q_next = tf.matmul(l2, w3) + b3
 
     def store_transition(self, s, a, r, s_):
         if not hasattr(self, 'memory_counter'):
             self.memory_counter = 0
 
-        action_hotspot = a[0]
-        action_staying_time = a[1]
-        transition = np.hstack((s, [action_hotspot, action_staying_time, r], s_))
+        # action_hotspot = a[0]
+        # action_staying_time = a[1]
+        # transition = np.hstack((s, [action_hotspot, action_staying_time, r], s_))
+        transition = np.hstack((s, a, r, s_))
         # replace the old memory with new memory
         index = self.memory_counter % self.memory_size
         self.memory[index, :] = transition
@@ -187,6 +198,7 @@ class DeepQNetwork:
             current_phase = self.get_current_action_one_hot_encoded(hour)
             chose_value = -sys.maxsize-1
             chose_action = None
+            chose_action_encoded = None
             # 遍历所有action 找到神经网络返回最大的action_value 的 action
             for key, value in current_phase.items():
                 value = value[np.newaxis, :]
@@ -195,11 +207,14 @@ class DeepQNetwork:
                 if action_value[0][0] > chose_value:
                     chose_value = action_value
                     chose_action = key
+                    chose_action_encoded = value
             action = chose_action
             # 对action 处理，因为得到的action 形如 '23,4' ，表示在第23个hotspot 待4个t,转换成ndarray [23 4]
             action = list(action.split(','))
             action = list(map(int, action))
             action.append(hour)
+            for i in chose_action_encoded[0]:
+                action.append(i)
             action = np.array(action)
             ###########################################################
 
@@ -209,21 +224,25 @@ class DeepQNetwork:
             hour = int(seconds / 3600) + 8
             current_phase = self.get_current_action_one_hot_encoded(hour)
             # 随机从current_phase 选出一个action，代码其他的地方好像用的是伪随机数
-            action, _ = random.choice(list(current_phase.items()))
+            action, action_encoded = random.choice(list(current_phase.items()))
             # 对action 处理，因为得到的action 形如 '23,4' ，表示在第23个hotspot 待4个t,转换成ndarray [23 4]
             action = list(action.split(','))
             action = list(map(int, action))
             action.append(hour)
+            for i in action_encoded:
+                action.append(i)
             action = np.array(action)
             ###########################################################
         return action
 
     # 在八点时刻，随机选一个action。这个函数供环境在初始化的时候使用
     def random_action(self):
-        action, _ = random.choice(list(self.action_one_hot_encoded_8.items()))
+        action, action_encoded = random.choice(list(self.action_one_hot_encoded_8.items()))
         action = list(action.split(','))
         action = list(map(int, action))
         action.append(8)
+        for i in action_encoded:
+            action.append(i)
         action = np.array(action)
         return action
 
@@ -319,51 +338,68 @@ class DeepQNetwork:
         #         self.s: batch_memory[:, :self.n_features],  # newest params
         #     })
         # ################################################################
-
-        q_next_batch_memory_state = batch_memory[:, -117:]
+        q_next_res_action_state_batch_memory = None
+        q_next_batch_memory_state = batch_memory[:, 117:]
         rows_n, cols_n = q_next_batch_memory_state.shape
+        for row in range(rows_n):
+            q_next_state = q_next_batch_memory_state[row]
+            hour = int(q_next_state[2])
+            current_phase = self.get_current_action_one_hot_encoded(hour)
 
-
-        # 获得当前的时间段，通过当前时间段 所有action 中的最大reward
-        hour = int(seconds / 3600) + 8
-        current_phase = self.get_current_action_one_hot_encoded(hour)
-        # 遍历所有action 找到神经网络返回最大的action_value 的 action
-        q_next_batch_memory_state = batch_memory[:, -117:]
-        rows, cols = q_next_batch_memory_state.shape
-        for row in range(rows):
-            q_next_state = q_next_batch_memory_state[row][np.newaxis, :]
-            choose_value = -sys.maxsize-1
+            choose_value = -sys.maxsize - 1
             choose_action = None
+
             for _, action in current_phase.items():
                 action = action[np.newaxis, :]
-                action_state = np.c_[action, q_next_state]
-
+                action_state = np.c_[action, q_next_state[-117:][np.newaxis, :]]
                 action_value = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
                 if action_value[0][0] > choose_value:
                     choose_action = action
             if row == 0:
-                q_next_res_action_state_batch_memory = np.c_[choose_action, q_next_state]
+                q_next_res_action_state_batch_memory = np.c_[choose_action, q_next_state[-117:][np.newaxis, :]]
             else:
-                q_next_res_action_state_batch_memory = np.vstack((q_next_res_action_state_batch_memory, np.c_[choose_action, q_next_state]))
+                q_next_res_action_state_batch_memory = np.vstack((q_next_res_action_state_batch_memory, np.c_[choose_action, q_next_state[-117:][np.newaxis, :]]))
 
-        q_eval_batch_memory_state = batch_memory[:, :119]
-        rows_e, cols_e = q_eval_batch_memory_state.shape
-        for row in range(rows_e):
-            q_eval_state = q_eval_batch_memory_state[row][:117][np.newaxis, :]
-            action = q_eval_batch_memory_state[row][-2:]
-            action = str(int(action[0])) + ',' + str(int(action[1]))
-            action_encoded = None
-            for key, value in current_phase.items():
-                if action == key:
-                    action_encoded = value[np.newaxis, :]
-                    break
-            if row == 0:
-                q_eval_res_action_state_batch_memory = np.c_[action_encoded, q_eval_state]
-            else:
-                print(q_eval_res_action_state_batch_memory.shape)
-                print(action_encoded.shape)
-                print(q_eval_state.shape)
-                q_eval_res_action_state_batch_memory = np.vstack((q_eval_res_action_state_batch_memory, np.c_[action_encoded, q_eval_state]))
+        # 获得当前的时间段，通过当前时间段 所有action 中的最大reward
+        # hour = int(seconds / 3600) + 8
+        # current_phase = self.get_current_action_one_hot_encoded(hour)
+        # # 遍历所有action 找到神经网络返回最大的action_value 的 action
+        # q_next_batch_memory_state = batch_memory[:, -117:]
+        # rows, cols = q_next_batch_memory_state.shape
+        # for row in range(rows):
+        #     q_next_state = q_next_batch_memory_state[row][np.newaxis, :]
+        #     choose_value = -sys.maxsize-1
+        #     choose_action = None
+        #     for _, action in current_phase.items():
+        #         action = action[np.newaxis, :]
+        #         action_state = np.c_[action, q_next_state]
+        #
+        #         action_value = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
+        #         if action_value[0][0] > choose_value:
+        #             choose_action = action
+        #     if row == 0:
+        #         q_next_res_action_state_batch_memory = np.c_[choose_action, q_next_state]
+        #     else:
+        #         q_next_res_action_state_batch_memory = np.vstack((q_next_res_action_state_batch_memory, np.c_[choose_action, q_next_state]))
+        #
+        # q_eval_batch_memory_state = batch_memory[:, :119]
+        # rows_e, cols_e = q_eval_batch_memory_state.shape
+        # for row in range(rows_e):
+        #     q_eval_state = q_eval_batch_memory_state[row][:117][np.newaxis, :]
+        #     action = q_eval_batch_memory_state[row][-2:]
+        #     action = str(int(action[0])) + ',' + str(int(action[1]))
+        #     action_encoded = None
+        #     for key, value in current_phase.items():
+        #         if action == key:
+        #             action_encoded = value[np.newaxis, :]
+        #             break
+        #     if row == 0:
+        #         q_eval_res_action_state_batch_memory = np.c_[action_encoded, q_eval_state]
+        #     else:
+        #         print(q_eval_res_action_state_batch_memory.shape)
+        #         print(action_encoded.shape)
+        #         print(q_eval_state.shape)
+        #         q_eval_res_action_state_batch_memory = np.vstack((q_eval_res_action_state_batch_memory, np.c_[action_encoded, q_eval_state]))
 
         # for _, action in current_phase.items():
         #     action = action[np.newaxis, :]
@@ -376,9 +412,9 @@ class DeepQNetwork:
         #         chose_value = action_value
         value = self.sess.run(self.q_next, feed_dict={self.s_: q_next_res_action_state_batch_memory})
         value = np.transpose(value)[0]
-        reward = batch_memory[:, 119]
+        reward = batch_memory[:, -118]
         q_target = reward + self.gamma * value
-        q_target = np.transpose(q_target)
+        q_target = np.transpose([q_target])
         # change q_target w.r.t q_eval's action
         # q_target = q_eval.copy()
 
@@ -418,11 +454,25 @@ class DeepQNetwork:
         # _, self.cost = self.sess.run([self._train_op, self.loss],
         #                              feed_dict={self.s: batch_memory[:, :119],
         #                                         self.q_target: q_target})
+        print(q_target.shape)
+        q_eval_res_action_state_batch_memory = None
+        q_eval_batch_memory_state = batch_memory[:, :263]
+        rows_e, cols_e = q_eval_batch_memory_state.shape
+        for row in range(rows_e):
+            state = q_eval_batch_memory_state[row][: 117][np.newaxis, :]
+            action = q_eval_batch_memory_state[row][-43:][np.newaxis, :]
+            if row == 0:
+                q_eval_res_action_state_batch_memory = np.c_[action, state]
+            else:
+                q_eval_res_action_state_batch_memory = np.vstack((q_eval_res_action_state_batch_memory, np.c_[action, state]))
         _, self.cost = self.sess.run([self._train_op, self.loss],
                                      feed_dict={self.s: q_eval_res_action_state_batch_memory,
                                                 self.q_target: q_target})
+        # eval_res = self.sess.run(self.q_eval, feed_dict={self.s: q_eval_res_action_state_batch_memory})
+        # print(eval_res.shape)
+        # print(q_eval_res_action_state_batch_memory.shape)
         self.cost_his.append(self.cost)
-
+        print(self.cost)
         # increasing epsilon
         self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
         self.learn_step_counter += 1

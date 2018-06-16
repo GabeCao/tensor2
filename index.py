@@ -11,14 +11,15 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
-    a = np.array([[1, 2, 3, 6, 4],
-                  [2, 4, 5, 11, 23]
-                  ])
-
-    b = a[0]
-    b = b[-2:0]
-    # b = str(b[0]) + ',' + str(b[1])
+    # a = np.array([[1, 2, 3, 6, 4],
+    #               [1, 3, 12, 42, 44]
+    #               ])
+    a = np.array([1, 2, 3, 6, 4]
+                  )
+    b = a[-1:]
     print(b)
+    # b = str(b[0]) + ',' + str(b[1])
+    # print(b)
     # e = np.array([0, 51, 31])
     # f = np.array([1, 3, 4])
     # e = e[np.newaxis, :]

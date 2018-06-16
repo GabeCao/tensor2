@@ -1,12 +1,11 @@
 from sklearn.preprocessing import LabelBinarizer
 import math
-from RL_brain_modified import DeepQNetwork
 from Hotspot import Hotspot
 from Point import Point
 import numpy as np
 
 
-class Evn:
+class Env:
     def __init__(self):
         # 当前环境state
         self.state = []
@@ -17,6 +16,8 @@ class Evn:
         self.one_episode_time = 14 * 3600
         # sensor 和 mc的能量信息
         self.sensors_mobile_charger = {}
+        # 初始化所有的sensor,mc 的能量信息
+        self.set_sensors_mobile_charger()
         # 初始化self.sensors_mobile_charger 和 self.sensors
         # self.set_sensors_mobile_charger()
         # 对剩余寿命进行独热编码
@@ -29,6 +30,8 @@ class Evn:
         self.belong_one_hot_encoded = self.belong_label_binarizer.fit_transform(self.belong)
         # 获得所有的hotspot
         self.hotspots = []
+        # 初始化hotspots
+        self.set_hotspots()
         # 记录当前时刻所在的hotspot，在环境初始化的时候设置为base_station
         self.current_hotspot = self.hotspots[0]
 
@@ -40,8 +43,6 @@ class Evn:
         self.mc_charging_energy_consumption = 0
         # 充电惩罚值
         self.charging_penalty = -1
-
-        self.done = False
 
     def set_sensors_mobile_charger(self):
         # [0.7 * 6 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，
@@ -321,20 +322,15 @@ class Evn:
 
         # mc 给到达的sensor 充电后，如果能量为负或者 self.get_evn_time() > self.one_episode_time，则回合结束，反之继续
         if self.sensors_mobile_charger['MC'][0] <= 0 or self.get_evn_time() > self.one_episode_time:
-            self.done = True
+            done = True
         else:
-            self.done = False
+            done = False
 
-        print(self.done)
         observation = np.array(self.state)
-        return observation, reward, self.done
+        return observation, reward, done
 
     # 初始化整个环境
     def reset(self, RL):
-        # 初始化所有的sensor,mc 的能量信息
-        self.set_sensors_mobile_charger()
-        # 初始化hotspots
-        self.set_hotspots()
         # 前面0~47 都初始化为 0。记录CS的信息
         for i in range(48):
             self.state.append(0)

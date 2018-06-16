@@ -199,18 +199,21 @@ class DeepQNetwork:
             # 对action 处理，因为得到的action 形如 '23,4' ，表示在第23个hotspot 待4个t,转换成ndarray [23 4]
             action = list(action.split(','))
             action = list(map(int, action))
+            action.append(hour)
             action = np.array(action)
             ###########################################################
 
         else:
             # action = np.random.randint(0, self.n_actions)
             ###########################################################
-            current_phase = self.get_current_action_one_hot_encoded
+            hour = int(seconds / 3600) + 8
+            current_phase = self.get_current_action_one_hot_encoded(hour)
             # 随机从current_phase 选出一个action，代码其他的地方好像用的是伪随机数
             action, _ = random.choice(list(current_phase.items()))
             # 对action 处理，因为得到的action 形如 '23,4' ，表示在第23个hotspot 待4个t,转换成ndarray [23 4]
             action = list(action.split(','))
             action = list(map(int, action))
+            action.append(hour)
             action = np.array(action)
             ###########################################################
         return action
@@ -220,6 +223,7 @@ class DeepQNetwork:
         action, _ = random.choice(list(self.action_one_hot_encoded_8.items()))
         action = list(action.split(','))
         action = list(map(int, action))
+        action.append(8)
         action = np.array(action)
         return action
 
@@ -295,7 +299,7 @@ class DeepQNetwork:
             elif file == '21.txt':
                 self.action_to_one_hot_encoded(path, file, self.action_one_hot_encoded_21)
 
-    def learn(self, seconds):
+    def learn(self):
         # check to replace target parameters
         if self.learn_step_counter % self.replace_target_iter == 0:
             self.sess.run(self.replace_target_op)
@@ -315,21 +319,66 @@ class DeepQNetwork:
         #         self.s: batch_memory[:, :self.n_features],  # newest params
         #     })
         # ################################################################
+
+        q_next_batch_memory_state = batch_memory[:, -117:]
+        rows_n, cols_n = q_next_batch_memory_state.shape
+
+
         # 获得当前的时间段，通过当前时间段 所有action 中的最大reward
         hour = int(seconds / 3600) + 8
         current_phase = self.get_current_action_one_hot_encoded(hour)
-        chose_value = 0
         # 遍历所有action 找到神经网络返回最大的action_value 的 action
-        for _, action in current_phase.items():
-            action = action[np.newaxis, :]
-            # action_observation = np.c_[action, observation]
-            action_value = self.sess.run(self.q_next,
-                                         feed_dict={self.s: np.c_[action, batch_memory[:, -self.n_features:]]})
-            if action_value > chose_value:
-                chose_value = action_value
+        q_next_batch_memory_state = batch_memory[:, -117:]
+        rows, cols = q_next_batch_memory_state.shape
+        for row in range(rows):
+            q_next_state = q_next_batch_memory_state[row][np.newaxis, :]
+            choose_value = -sys.maxsize-1
+            choose_action = None
+            for _, action in current_phase.items():
+                action = action[np.newaxis, :]
+                action_state = np.c_[action, q_next_state]
 
-        reward = batch_memory[:, self.n_features + 1]
-        q_target = reward + self.gamma * chose_value
+                action_value = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
+                if action_value[0][0] > choose_value:
+                    choose_action = action
+            if row == 0:
+                q_next_res_action_state_batch_memory = np.c_[choose_action, q_next_state]
+            else:
+                q_next_res_action_state_batch_memory = np.vstack((q_next_res_action_state_batch_memory, np.c_[choose_action, q_next_state]))
+
+        q_eval_batch_memory_state = batch_memory[:, :119]
+        rows_e, cols_e = q_eval_batch_memory_state.shape
+        for row in range(rows_e):
+            q_eval_state = q_eval_batch_memory_state[row][:117][np.newaxis, :]
+            action = q_eval_batch_memory_state[row][-2:]
+            action = str(int(action[0])) + ',' + str(int(action[1]))
+            action_encoded = None
+            for key, value in current_phase.items():
+                if action == key:
+                    action_encoded = value[np.newaxis, :]
+                    break
+            if row == 0:
+                q_eval_res_action_state_batch_memory = np.c_[action_encoded, q_eval_state]
+            else:
+                print(q_eval_res_action_state_batch_memory.shape)
+                print(action_encoded.shape)
+                print(q_eval_state.shape)
+                q_eval_res_action_state_batch_memory = np.vstack((q_eval_res_action_state_batch_memory, np.c_[action_encoded, q_eval_state]))
+
+        # for _, action in current_phase.items():
+        #     action = action[np.newaxis, :]
+        #     print(action.shape)
+        #     print(batch_memory[:, -self.n_features:].shape)
+        #     # action_observation = np.c_[action, observation]
+        #     action_value = self.sess.run(self.q_next,
+        #                                  feed_dict={self.s: np.c_[action, batch_memory[:, -self.n_features:]]})
+        #     if action_value > chose_value:
+        #         chose_value = action_value
+        value = self.sess.run(self.q_next, feed_dict={self.s_: q_next_res_action_state_batch_memory})
+        value = np.transpose(value)[0]
+        reward = batch_memory[:, 119]
+        q_target = reward + self.gamma * value
+        q_target = np.transpose(q_target)
         # change q_target w.r.t q_eval's action
         # q_target = q_eval.copy()
 
@@ -366,15 +415,18 @@ class DeepQNetwork:
         """
 
         # train eval network
+        # _, self.cost = self.sess.run([self._train_op, self.loss],
+        #                              feed_dict={self.s: batch_memory[:, :119],
+        #                                         self.q_target: q_target})
         _, self.cost = self.sess.run([self._train_op, self.loss],
-                                     feed_dict={self.s: batch_memory[:, :self.n_features],
+                                     feed_dict={self.s: q_eval_res_action_state_batch_memory,
                                                 self.q_target: q_target})
         self.cost_his.append(self.cost)
 
         # increasing epsilon
         self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
         self.learn_step_counter += 1
-
+        print('...........')
     def plot_cost(self):
         import matplotlib.pyplot as plt
         plt.plot(np.arange(len(self.cost_his)), self.cost_his)

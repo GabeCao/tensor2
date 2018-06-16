@@ -11,13 +11,29 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
-    a = np.array([1, 2, 3])
-    b = np.array([4, 5, 6])
-    c = np.r_[a, b]
-    a[1] = 9
-    print(a)
+    a = np.array([[1, 2, 3, 6, 4],
+                  [2, 4, 5, 11, 23]
+                  ])
+
+    b = a[0]
+    b = b[-2:0]
+    # b = str(b[0]) + ',' + str(b[1])
     print(b)
-    print(c)
+    # e = np.array([0, 51, 31])
+    # f = np.array([1, 3, 4])
+    # e = e[np.newaxis, :]
+    # f = f[np.newaxis, :]
+    #
+    # b = np.array([4, 5, 1])
+    # d = np.array([11, 33, 44])
+    # b = b[np.newaxis, :]
+    # d = d[np.newaxis, :]
+    # c = np.c_[b, d]
+    # c = np.vstack((c, np.c_[e, f]))
+    # print(c)
+    # rows, cols = a.shape
+    # for row in rows:
+    #     a[row]
     # a = [str(i) for i in range(1, 43)]
     # print(a)
     # label_binarizer = LabelBinarizer()

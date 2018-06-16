@@ -1,4 +1,4 @@
-from Evn_modified import Evn
+from Env_modified import Env
 from RL_brain_modified import DeepQNetwork
 
 
@@ -8,7 +8,7 @@ def run_maze():
         print('episode = ', episode)
         # initial observation
         init = True
-
+        env = Env()
         while True:
 
             if init is True:
@@ -20,7 +20,7 @@ def run_maze():
 
             # RL take action and get next observation and reward
             observation_, reward, done = env.step(action)
-            print(done)
+            print(action)
             print(reward)
             RL.store_transition(observation, action, reward, observation_)
 
@@ -41,7 +41,6 @@ def run_maze():
 
 if __name__ == "__main__":
     # game
-    env = Evn()
     RL = DeepQNetwork(learning_rate=0.01,
                       reward_decay=0.9,
                       e_greedy=0.9,

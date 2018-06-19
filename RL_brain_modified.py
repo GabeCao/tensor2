@@ -15,7 +15,7 @@ class DeepQNetwork:
     def __init__(
             self,
             n_actions=1,
-            n_features=160,
+            n_features=195,
             learning_rate=0.01,
             reward_decay=0.9,
             e_greedy=0.9,
@@ -40,7 +40,7 @@ class DeepQNetwork:
         self.learn_step_counter = 0
 
         # initialize zero memory [s, a, r, s_]
-        self.memory = np.zeros((self.memory_size, 117 * 2 + 3 + 43 + 1))
+        self.memory = np.zeros((self.memory_size, 152 * 2 + 2 + 43 + 1 + 1 + 1))
 
         # consist of [target_net, evaluate_net]
         self._build_net()
@@ -135,14 +135,14 @@ class DeepQNetwork:
                 b3 = tf.get_variable('b3', [1, self.n_actions], initializer=b_initializer, collections=c_names)
                 self.q_next = tf.matmul(l2, w3) + b3
 
-    def store_transition(self, s, a, r, s_):
+    def store_transition(self, s, a, r, done, phase, s_):
         if not hasattr(self, 'memory_counter'):
             self.memory_counter = 0
 
         # action_hotspot = a[0]
         # action_staying_time = a[1]
         # transition = np.hstack((s, [action_hotspot, action_staying_time, r], s_))
-        transition = np.hstack((s, a, r, s_))
+        transition = np.hstack((s, a, r, done, phase, s_))
         # replace the old memory with new memory
         index = self.memory_counter % self.memory_size
         self.memory[index, :] = transition
@@ -212,7 +212,6 @@ class DeepQNetwork:
             # 对action 处理，因为得到的action 形如 '23,4' ，表示在第23个hotspot 待4个t,转换成ndarray [23 4]
             action = list(action.split(','))
             action = list(map(int, action))
-            action.append(hour)
             for i in chose_action_encoded[0]:
                 action.append(i)
             action = np.array(action)
@@ -228,7 +227,6 @@ class DeepQNetwork:
             # 对action 处理，因为得到的action 形如 '23,4' ，表示在第23个hotspot 待4个t,转换成ndarray [23 4]
             action = list(action.split(','))
             action = list(map(int, action))
-            action.append(hour)
             for i in action_encoded:
                 action.append(i)
             action = np.array(action)
@@ -240,7 +238,6 @@ class DeepQNetwork:
         action, action_encoded = random.choice(list(self.action_one_hot_encoded_8.items()))
         action = list(action.split(','))
         action = list(map(int, action))
-        action.append(8)
         for i in action_encoded:
             action.append(i)
         action = np.array(action)
@@ -256,11 +253,6 @@ class DeepQNetwork:
                 data = line.strip().split(',')
                 hotspots.append(data[0])
                 hotspot_max_staying_time[data[0]] = data[1]
-        # 对hotpsots 进行独热编码
-        # label_binarizer = LabelBinarizer()
-        # hotspot_one_hot_encoded = label_binarizer.fit_transform(hotspots)
-        # 获取独热编码后的行和列
-        # rows, cols = self.hotspot_num_one_hot_encoded.shape
 
         for hotspot_num, max_staying_time in hotspot_max_staying_time.items():
             # 根据hotspot_num 找到 对应的热编码后的结果
@@ -269,18 +261,6 @@ class DeepQNetwork:
             for i in range(1, max_staying_time + 1):
                 tmp = np.r_[hotspot_num_encoded, i]
                 action_one_hot_encoded[hotspot_num + ',' + str(i)] = tmp
-
-        # for row in range(rows):
-        #     # 获得独热编码前的hotspot 编号，用这个编号在hotspot_max_staying_time 找到其最大等待时间
-        #     hotspot = label_binarizer.inverse_transform(hotspot_one_hot_encoded[[row]])[0]
-        #     for key, value in hotspot_max_staying_time.items():
-        #         if hotspot == key:
-        #             max_staying_time = int(hotspot_max_staying_time[key])
-        #             # 找到最大等待时间以后，对独热编码后的当前行后面添加一个等待时间(从1到最大等待时间)
-        #             for i in range(1, max_staying_time + 1):
-        #                 tmp = hotspot_one_hot_encoded[row]
-        #                 tmp = np.r_[tmp, i]
-        #                 action_one_hot_encoded[hotspot + ',' + str(i)] = tmp
 
     def set_action_one_hot_encoded(self):
         # 保存最大等待时间的文件夹
@@ -338,6 +318,47 @@ class DeepQNetwork:
         #         self.s: batch_memory[:, :self.n_features],  # newest params
         #     })
         # ################################################################
+        # 获得batch_memory 的行数和列数
+        rows, cols = batch_memory.shape
+        for row in range(rows):
+            batch_memory_row = batch_memory[row]
+            # 获得state_i
+            state_i = batch_memory_row[: 152][np.newaxis, :]
+            # 获得action_i
+            action_i = batch_memory_row[154: 197][np.newaxis, :]
+            # 将state_i 和 action_i 拼接在一起，放在q_eval_all_action_state，以后传入eval_net
+            q_eval_action_state = np.c_[action_i, state_i]
+            if row == 0:
+                q_eval_all_action_state = q_eval_action_state
+            else:
+                q_eval_all_action_state = np.vstack((q_eval_all_action_state, q_eval_action_state))
+
+            choose_value = -sys.maxsize - 1
+            choose_action = None
+            # 得到state_i+1 的时间段
+            phase = batch_memory_row[-153]
+            # 得到state_i+1
+            state_i_1 = batch_memory_row[-152:][np.newaxis:]
+            current_phase = self.get_current_action_one_hot_encoded(phase)
+            # 遍历当前时间段的所有action，得到返回最大reward的action
+            # 将得到的action和state_i+1 拼接起来，放入到q_next_all_state_action,以后传入target_net
+            for _, action_i_1 in current_phase.items():
+                action_i_1 = action_i_1[np.newaxis, :]
+                action_state = np.c_[action_i_1, state_i_1]
+                state_i_1_reward = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
+                if state_i_1_reward[0][0] > choose_value:
+                    choose_action = action_i_1
+            if row == 0:
+                q_next_all_state_action = np.c_[choose_action, state_i_1]
+            else:
+                q_next_all_state_action = np.vstack((q_next_all_state_action, np.c_[choose_action, state_i_1]))
+
+            reward_i = batch_memory_row[-155]
+            done = batch_memory_row[-154]
+
+            # done == 1 表示 state_i+1 is terminal
+            if row == 0 and done == 1:
+                y_i =
         q_next_res_action_state_batch_memory = None
         q_next_batch_memory_state = batch_memory[:, 117:]
         rows_n, cols_n = q_next_batch_memory_state.shape

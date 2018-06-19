@@ -19,8 +19,8 @@ def run_maze():
             action = RL.choose_action(observation, env.get_evn_time())
 
             # RL take action and get next observation and reward
-            observation_, reward, done = env.step(action)
-            RL.store_transition(observation, action, reward, observation_)
+            observation_, reward, done, phase = env.step(action)
+            RL.store_transition(observation, action, reward, done, phase, observation_)
             print('step     ', step)
             if (step > 20) and (step % 5 == 0):
                 RL.learn()

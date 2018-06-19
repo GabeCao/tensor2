@@ -11,13 +11,22 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
+    a = np.array([1, 2, 3, 2, 4, 11, 22])
+    # action = a[4: 7][np.newaxis, :]
+    # state = a[: 2][np.newaxis, :]
+    # res = np.c_[action, state]
+
+    a = np.array(list(a[-2]))[np.newaxis, :]
+    print(a)
+    print(a.shape)
     # a = np.array([[1, 2, 3, 6, 4],
     #               [1, 3, 12, 42, 44]
     #               ])
-    a = np.array([1, 2, 3, 6, 4]
-                  )
-    b = a[-1:]
-    print(b)
+    # print(a.shape)
+    # a = np.array([1, 2, 3, 6, 4]
+    #               )
+    # b = a[-1:]
+    # print(b)
     # b = str(b[0]) + ',' + str(b[1])
     # print(b)
     # e = np.array([0, 51, 31])

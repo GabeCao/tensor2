@@ -110,7 +110,7 @@ class Env:
         # 当前hotspot 和 下一个hotspot间的距离,得到移动花费的时间，添加到self.move_time 里
         distance = hotspot.get_distance_between_hotspot(self.current_hotspot)
         time = distance / self.speed
-        self.move_time += time
+        # self.move_time += time
 
         for key, value in self.sensors_mobile_charger.items():
             if key == 'MC':
@@ -142,6 +142,7 @@ class Env:
         self.state[2 * (hotspot_num - 1)] += 1
         self.state[2 * (hotspot_num - 1) + 1] += staying_time
         # mc 结束等待后环境的时间
+        self.move_time += time
         end_wait_seconds = self.get_evn_time()
         # 在一次执行action 的过程中，sensor只能被充电一次
         self.initial_is_charged()
@@ -338,14 +339,15 @@ class Env:
         for i in range(42 * 2):
             self.state.append(0)
         # 84位开始记录sensor的信息,每一个sensor需要4位，17个sensor，共68位
-        for i in range(42 * 2, 42 * 2 + 68 + 1):
+        for i in range(42 * 2, 42 * 2 + 68):
                 self.state.append(0)
         # 得到一个随机的8点时间段的action,例如 43,1 表示到43 号hotspot 等待1个t
+        # print(len(self.state))
         action = RL.random_action()
         self.current_hotspot = self.hotspots[0]
 
-        state__, reward_, done_ = self.step(action)
-        return state__, reward_, done_
+        state__, reward_, done_, phase = self.step(action)
+        return state__, reward_, done_, phase
 
     # 传入时间字符串，如：09：02：03，转化成与 08:00:00 间的秒数差
     def str_to_seconds(self, input_str):

@@ -16,7 +16,7 @@ if __name__ == '__main__':
     # state = a[: 2][np.newaxis, :]
     # res = np.c_[action, state]
 
-    a = np.array(list(a[-2]))[np.newaxis, :]
+    a = np.array([(a[-2])])[np.newaxis, :]
     print(a)
     print(a.shape)
     # a = np.array([[1, 2, 3, 6, 4],

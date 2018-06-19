@@ -311,12 +311,6 @@ class DeepQNetwork:
             sample_index = np.random.choice(self.memory_counter, size=self.batch_size)
         batch_memory = self.memory[sample_index, :]
 
-        # q_next, q_eval = self.sess.run(
-        #     [self.q_next, self.q_eval],
-        #     feed_dict={
-        #         self.s_: batch_memory[:, -self.n_features:],  # fixed params
-        #         self.s: batch_memory[:, :self.n_features],  # newest params
-        #     })
         # ################################################################
         # 获得batch_memory 的行数和列数
         rows, cols = batch_memory.shape
@@ -333,171 +327,61 @@ class DeepQNetwork:
             else:
                 q_eval_all_action_state = np.vstack((q_eval_all_action_state, q_eval_action_state))
 
-            choose_value = -sys.maxsize - 1
-            choose_action = None
-            # 得到state_i+1 的时间段
-            phase = batch_memory_row[-153]
-            # 得到state_i+1
-            state_i_1 = batch_memory_row[-152:][np.newaxis:]
-            current_phase = self.get_current_action_one_hot_encoded(phase)
-            # 遍历当前时间段的所有action，得到返回最大reward的action
-            # 将得到的action和state_i+1 拼接起来，放入到q_next_all_state_action,以后传入target_net
-            for _, action_i_1 in current_phase.items():
-                action_i_1 = action_i_1[np.newaxis, :]
-                action_state = np.c_[action_i_1, state_i_1]
-                state_i_1_reward = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
-                if state_i_1_reward[0][0] > choose_value:
-                    choose_action = action_i_1
-            if row == 0:
-                q_next_all_state_action = np.c_[choose_action, state_i_1]
-            else:
-                q_next_all_state_action = np.vstack((q_next_all_state_action, np.c_[choose_action, state_i_1]))
-
             reward_i = batch_memory_row[-155]
             done = batch_memory_row[-154]
 
             # done == 1 表示 state_i+1 is terminal
             if row == 0 and done == 1:
-                y_i =
-        q_next_res_action_state_batch_memory = None
-        q_next_batch_memory_state = batch_memory[:, 117:]
-        rows_n, cols_n = q_next_batch_memory_state.shape
-        for row in range(rows_n):
-            q_next_state = q_next_batch_memory_state[row]
-            hour = int(q_next_state[2])
-            current_phase = self.get_current_action_one_hot_encoded(hour)
+                q_target = np.array([reward_i])[np.newaxis, :]
+            elif row == 0 and done == 0:
+                choose_value = -sys.maxsize - 1
+                # 得到state_i+1 的时间段
+                phase = batch_memory_row[-153]
+                # 得到state_i+1
+                state_i_1 = batch_memory_row[-152:][np.newaxis, :]
+                current_phase = self.get_current_action_one_hot_encoded(phase)
+                # 遍历当前时间段的所有action，得到返回最大的reward
+                for _, action_i_1 in current_phase.items():
+                    action_i_1 = action_i_1[np.newaxis, :]
+                    action_state = np.c_[action_i_1, state_i_1]
+                    state_i_1_reward = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
+                    if state_i_1_reward[0][0] > choose_value:
+                        choose_value = state_i_1_reward[0][0]
 
-            choose_value = -sys.maxsize - 1
-            choose_action = None
+                y_i = reward_i + self.gamma * choose_value
+                q_target = np.array([y_i])[np.newaxis, :]
+            elif row != 0 and done == 1:
+                q_target = np.vstack((q_target, np.array([reward_i])[np.newaxis, :]))
+            elif row != 0 and done == 0:
+                choose_value = -sys.maxsize - 1
+                # 得到state_i+1 的时间段
+                phase = batch_memory_row[-153]
+                # 得到state_i+1
+                state_i_1 = batch_memory_row[-152:][np.newaxis, :]
+                current_phase = self.get_current_action_one_hot_encoded(phase)
+                # 遍历当前时间段的所有action，得到返回最大的reward
+                for _, action_i_1 in current_phase.items():
+                    action_i_1 = action_i_1[np.newaxis, :]
+                    action_state = np.c_[action_i_1, state_i_1]
+                    state_i_1_reward = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
+                    if state_i_1_reward[0][0] > choose_value:
+                        choose_value = state_i_1_reward[0][0]
 
-            for _, action in current_phase.items():
-                action = action[np.newaxis, :]
-                action_state = np.c_[action, q_next_state[-117:][np.newaxis, :]]
-                action_value = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
-                if action_value[0][0] > choose_value:
-                    choose_action = action
-            if row == 0:
-                q_next_res_action_state_batch_memory = np.c_[choose_action, q_next_state[-117:][np.newaxis, :]]
-            else:
-                q_next_res_action_state_batch_memory = np.vstack((q_next_res_action_state_batch_memory, np.c_[choose_action, q_next_state[-117:][np.newaxis, :]]))
+                y_i = reward_i + self.gamma * choose_value
+                q_target = np.vstack((q_target, np.array([y_i])[np.newaxis, :]))
 
-        # 获得当前的时间段，通过当前时间段 所有action 中的最大reward
-        # hour = int(seconds / 3600) + 8
-        # current_phase = self.get_current_action_one_hot_encoded(hour)
-        # # 遍历所有action 找到神经网络返回最大的action_value 的 action
-        # q_next_batch_memory_state = batch_memory[:, -117:]
-        # rows, cols = q_next_batch_memory_state.shape
-        # for row in range(rows):
-        #     q_next_state = q_next_batch_memory_state[row][np.newaxis, :]
-        #     choose_value = -sys.maxsize-1
-        #     choose_action = None
-        #     for _, action in current_phase.items():
-        #         action = action[np.newaxis, :]
-        #         action_state = np.c_[action, q_next_state]
-        #
-        #         action_value = self.sess.run(self.q_next, feed_dict={self.s_: action_state})
-        #         if action_value[0][0] > choose_value:
-        #             choose_action = action
-        #     if row == 0:
-        #         q_next_res_action_state_batch_memory = np.c_[choose_action, q_next_state]
-        #     else:
-        #         q_next_res_action_state_batch_memory = np.vstack((q_next_res_action_state_batch_memory, np.c_[choose_action, q_next_state]))
-        #
-        # q_eval_batch_memory_state = batch_memory[:, :119]
-        # rows_e, cols_e = q_eval_batch_memory_state.shape
-        # for row in range(rows_e):
-        #     q_eval_state = q_eval_batch_memory_state[row][:117][np.newaxis, :]
-        #     action = q_eval_batch_memory_state[row][-2:]
-        #     action = str(int(action[0])) + ',' + str(int(action[1]))
-        #     action_encoded = None
-        #     for key, value in current_phase.items():
-        #         if action == key:
-        #             action_encoded = value[np.newaxis, :]
-        #             break
-        #     if row == 0:
-        #         q_eval_res_action_state_batch_memory = np.c_[action_encoded, q_eval_state]
-        #     else:
-        #         print(q_eval_res_action_state_batch_memory.shape)
-        #         print(action_encoded.shape)
-        #         print(q_eval_state.shape)
-        #         q_eval_res_action_state_batch_memory = np.vstack((q_eval_res_action_state_batch_memory, np.c_[action_encoded, q_eval_state]))
+        # print(q_target.shape)
 
-        # for _, action in current_phase.items():
-        #     action = action[np.newaxis, :]
-        #     print(action.shape)
-        #     print(batch_memory[:, -self.n_features:].shape)
-        #     # action_observation = np.c_[action, observation]
-        #     action_value = self.sess.run(self.q_next,
-        #                                  feed_dict={self.s: np.c_[action, batch_memory[:, -self.n_features:]]})
-        #     if action_value > chose_value:
-        #         chose_value = action_value
-        value = self.sess.run(self.q_next, feed_dict={self.s_: q_next_res_action_state_batch_memory})
-        value = np.transpose(value)[0]
-        reward = batch_memory[:, -118]
-        q_target = reward + self.gamma * value
-        q_target = np.transpose([q_target])
-        # change q_target w.r.t q_eval's action
-        # q_target = q_eval.copy()
-
-        # batch_index = np.arange(self.batch_size, dtype=np.int32)
-        # eval_act_index = batch_memory[:, self.n_features].astype(int)
-        # reward = batch_memory[:, self.n_features + 1]
-        #
-        # q_target[batch_index, eval_act_index] = reward + self.gamma * np.max(q_next, axis=1)
-
-        """
-        For example in this batch I have 2 samples and 3 actions:
-        q_eval =
-        [[1, 2, 3],
-         [4, 5, 6]]
-
-        q_target = q_eval =
-        [[1, 2, 3],
-         [4, 5, 6]]
-
-        Then change q_target with the real q_target value w.r.t the q_eval's action.
-        For example in:
-            sample 0, I took action 0, and the max q_target value is -1;
-            sample 1, I took action 2, and the max q_target value is -2:
-        q_target =
-        [[-1, 2, 3],
-         [4, 5, -2]]
-
-        So the (q_target - q_eval) becomes:
-        [[(-1)-(1), 0, 0],
-         [0, 0, (-2)-(6)]]
-
-        We then backpropagate this error w.r.t the corresponding action to network,
-        leave other action as error=0 cause we didn't choose it.
-        """
-
-        # train eval network
-        # _, self.cost = self.sess.run([self._train_op, self.loss],
-        #                              feed_dict={self.s: batch_memory[:, :119],
-        #                                         self.q_target: q_target})
-        print(q_target.shape)
-        q_eval_res_action_state_batch_memory = None
-        q_eval_batch_memory_state = batch_memory[:, :263]
-        rows_e, cols_e = q_eval_batch_memory_state.shape
-        for row in range(rows_e):
-            state = q_eval_batch_memory_state[row][: 117][np.newaxis, :]
-            action = q_eval_batch_memory_state[row][-43:][np.newaxis, :]
-            if row == 0:
-                q_eval_res_action_state_batch_memory = np.c_[action, state]
-            else:
-                q_eval_res_action_state_batch_memory = np.vstack((q_eval_res_action_state_batch_memory, np.c_[action, state]))
         _, self.cost = self.sess.run([self._train_op, self.loss],
-                                     feed_dict={self.s: q_eval_res_action_state_batch_memory,
+                                     feed_dict={self.s: q_eval_all_action_state,
                                                 self.q_target: q_target})
-        # eval_res = self.sess.run(self.q_eval, feed_dict={self.s: q_eval_res_action_state_batch_memory})
-        # print(eval_res.shape)
-        # print(q_eval_res_action_state_batch_memory.shape)
+
         self.cost_his.append(self.cost)
-        print(self.cost)
+        # print('self.cost', self.cost)
         # increasing epsilon
         self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
         self.learn_step_counter += 1
-        print('...........')
+        print('learning ......', self.learn_step_counter, '   th times')
     def plot_cost(self):
         import matplotlib.pyplot as plt
         plt.plot(np.arange(len(self.cost_his)), self.cost_his)

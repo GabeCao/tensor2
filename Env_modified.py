@@ -128,7 +128,9 @@ class Env:
             if (sensor_reserved_energy < 0) and (value[3] is True):
                 value[3] = False
                 reward += self.charging_penalty
-
+                with open('C:/E/dataSet/2018-06-20/result.txt', 'a') as res:
+                    res.write('sensor  ' + key + '  死了  ' + '\n')
+                print('sensor  ' + key + '  死了  ')
         # 更新self.current_hotspot 为 action 中选择的 hotspot
         self.current_hotspot = hotspot
         # 更新mc的剩余能量，减去移动消耗的能量
@@ -367,15 +369,16 @@ class Env:
         return total_time
 
     def test(self):
-        self.done = True
-        return 2, 4, self.done
+        dis = 0
+        for h1 in self.hotspots:
+            for h2 in self.hotspots:
+                temp = h1.get_distance_between_hotspot(h2)
+                if temp > dis:
+                    dis = temp
+        print(dis)
 if __name__ == '__main__':
     evn = Env()
-    s_, reward, done = evn.test()
-    print(s_)
-    print(reward)
-    print(done)
-    # RL = DeepQNetwork()
+    evn.test()
     # state_, reward, done = evn.reset(RL)
     # print(state_)
     # print(reward)

@@ -30,7 +30,7 @@ class Greedy:
         # 充电惩罚值
         self.charging_penalty = -1
 
-        self.out_put_file = 'C:/E/dataSet/2018-06-11/greedy result 3.txt'
+        self.out_put_file = 'C:/E/dataSet/2018-06-20/greedy.txt'
 
     def set_sensors_mobile_charger(self):
         # [0.7 * 6 * 1000, 0.6, 0, True]  依次代表：上一次充电后的剩余能量，能量消耗的速率，上一次充电的时间，

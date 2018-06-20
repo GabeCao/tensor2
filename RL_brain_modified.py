@@ -20,8 +20,8 @@ class DeepQNetwork:
             reward_decay=0.9,
             e_greedy=0.9,
             replace_target_iter=300,
-            memory_size=500,
-            batch_size=32,
+            memory_size=1000,
+            batch_size=320,
             e_greedy_increment=None,
             output_graph=False,
     ):
@@ -381,7 +381,7 @@ class DeepQNetwork:
         # increasing epsilon
         self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
         self.learn_step_counter += 1
-        print('learning ......', self.learn_step_counter, '   th times')
+        print('learning ......', self.learn_step_counter, '    times')
     def plot_cost(self):
         import matplotlib.pyplot as plt
         plt.plot(np.arange(len(self.cost_his)), self.cost_his)

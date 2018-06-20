@@ -128,7 +128,7 @@ class Env:
             if (sensor_reserved_energy < 0) and (value[3] is True):
                 value[3] = False
                 reward += self.charging_penalty
-                with open('C:/E/dataSet/2018-06-20/result.txt', 'a') as res:
+                with open('C:/E/dataSet/2018-06-20/12/result.txt', 'a') as res:
                     res.write('sensor  ' + key + '  死了  ' + '\n')
                 print('sensor  ' + key + '  死了  ')
         # 更新self.current_hotspot 为 action 中选择的 hotspot

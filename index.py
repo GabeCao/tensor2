@@ -1,6 +1,7 @@
 from sklearn.preprocessing import LabelBinarizer
 import numpy as np
 import random
+import os
 
 def str_to_seconds(input_str):
     data = input_str.split(':')
@@ -11,14 +12,16 @@ def str_to_seconds(input_str):
 
 
 if __name__ == '__main__':
-    a = np.array([1, 2, 3, 2, 4, 11, 22])
-    # action = a[4: 7][np.newaxis, :]
-    # state = a[: 2][np.newaxis, :]
-    # res = np.c_[action, state]
-
-    a = np.array([(a[-2])])[np.newaxis, :]
-    print(a)
-    print(a.shape)
+    for i in range(8, 22):
+        print(i)
+    # res = {}
+    # files = os.listdir('hotspot中sensor的访问情况/' + str(8) + '时间段')
+    # for file in files:
+    #     hotspot_num = file.split('.')[0]
+    #     with open('hotspot中sensor的访问情况/' + str(8) + '时间段/' + file) as f:
+    #         lines = f.readlines()
+    #         res[hotspot_num] = lines
+    # print(res)
     # a = np.array([[1, 2, 3, 6, 4],
     #               [1, 3, 12, 42, 44]
     #               ])
